@@ -88,6 +88,9 @@ export default function SubmitIdea() {
   const [evaluationResult, setEvaluationResult] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [parsedScores, setParsedScores] = useState<ParsedScores | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<ProjectData>({
     name: "", description: "", sector: "", location: "", capital: "",
