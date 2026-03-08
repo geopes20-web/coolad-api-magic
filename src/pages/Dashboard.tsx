@@ -2,25 +2,29 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
 import {
   Loader2, Rocket, DollarSign, Compass, Lightbulb, TrendingUp,
   MessageSquare, Bookmark, ArrowRight, Plus, Sparkles, BarChart3,
+  CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw,
 } from "lucide-react";
 
 interface IdeaRow {
   id: string; title: string; sector: string; ai_score: number;
   risk_score: number; created_at: string; status: string;
+  decision: string; evaluation_version: number;
+  [key: string]: unknown;
 }
 
-interface MessageRow {
-  id: string; content: string; created_at: string; read: boolean;
-  sender_id: string; receiver_id: string;
-  sender_profile?: { full_name: string } | null;
-  receiver_profile?: { full_name: string } | null;
+interface AccessRequestRow {
+  id: string; idea_id: string; investor_id: string; status: string; created_at: string;
+  investor_profile?: { full_name: string } | null;
+  idea_title?: string;
 }
 
 interface SavedRow {
@@ -28,11 +32,18 @@ interface SavedRow {
   ideas: { id: string; title: string; sector: string; ai_score: number } | null;
 }
 
+interface MessageRow {
+  id: string; content: string; created_at: string; read: boolean;
+  sender_id: string; receiver_id: string;
+}
+
 export default function Dashboard() {
   const { user, loading, userRole } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [myIdeas, setMyIdeas] = useState<IdeaRow[]>([]);
   const [savedIdeas, setSavedIdeas] = useState<SavedRow[]>([]);
+  const [accessRequests, setAccessRequests] = useState<AccessRequestRow[]>([]);
   const [recentMessages, setRecentMessages] = useState<MessageRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -41,25 +52,33 @@ export default function Dashboard() {
     const load = async () => {
       const promises: Promise<void>[] = [];
 
-      // My ideas (for entrepreneurs)
       if (userRole === "entrepreneur") {
         promises.push(
-          supabase.from("ideas").select("id, title, sector, ai_score, risk_score, created_at, status")
+          supabase.from("ideas").select("id, title, sector, ai_score, risk_score, created_at, status, decision, evaluation_version")
             .eq("founder_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setMyIdeas((data as IdeaRow[]) || []); }) as unknown as Promise<void>
+            .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
+        );
+        // Access requests for entrepreneur's ideas
+        promises.push(
+          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at")
+            .eq("founder_id", user.id).order("created_at", { ascending: false })
+            .then(({ data }) => { setAccessRequests((data as unknown as AccessRequestRow[]) || []); }) as unknown as Promise<void>
         );
       }
 
-      // Saved ideas (for investor/explorer)
       if (userRole === "investor" || userRole === "explorer") {
         promises.push(
           supabase.from("saved_ideas").select("id, idea_id, ideas(id, title, sector, ai_score)")
             .eq("user_id", user.id).order("created_at", { ascending: false })
             .then(({ data }) => { setSavedIdeas((data as unknown as SavedRow[]) || []); }) as unknown as Promise<void>
         );
+        promises.push(
+          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at")
+            .eq("investor_id", user.id).order("created_at", { ascending: false })
+            .then(({ data }) => { setAccessRequests((data as unknown as AccessRequestRow[]) || []); }) as unknown as Promise<void>
+        );
       }
 
-      // Messages
       promises.push(
         supabase.from("messages").select("id, content, created_at, read, sender_id, receiver_id")
           .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
@@ -73,6 +92,12 @@ export default function Dashboard() {
     load();
   }, [user, userRole]);
 
+  const handleAccessAction = async (requestId: string, action: "approved" | "rejected") => {
+    await supabase.from("access_requests").update({ status: action } as any).eq("id", requestId);
+    setAccessRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
+    toast({ title: t.common.success, description: action === "approved" ? t.dashboard.approve : t.dashboard.reject });
+  };
+
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!user) return <Navigate to="/login" replace />;
 
@@ -80,11 +105,17 @@ export default function Dashboard() {
   const roleLabel = userRole === "entrepreneur" ? t.auth.entrepreneur : userRole === "investor" ? t.auth.investor : t.auth.explorer;
   const Icon = roleIcon;
 
+  const getDecisionBadge = (decision?: string) => {
+    if (decision === "accepted") return <Badge className="bg-primary/10 text-primary border-primary/20 text-xs"><CheckCircle className="h-3 w-3 me-1" />{t.dashboard.accepted}</Badge>;
+    if (decision === "needs_improvement") return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-xs"><AlertTriangle className="h-3 w-3 me-1" />{t.dashboard.needsImprovement}</Badge>;
+    if (decision === "rejected") return <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-xs"><XCircle className="h-3 w-3 me-1" />{t.dashboard.rejected}</Badge>;
+    return <Badge variant="outline" className="text-xs">{t.dashboard.pending}</Badge>;
+  };
+
   return (
     <div className="container mx-auto px-4 py-10 max-w-5xl">
-      {/* Header */}
-      <div className="glass rounded-2xl p-6 shadow-glass mb-6">
-        <div className="flex items-center justify-between">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6 shadow-glass mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center">
               <Icon className="h-7 w-7 text-primary-foreground" />
@@ -101,20 +132,28 @@ export default function Dashboard() {
               </Button>
             </Link>
           )}
+          {(userRole === "investor" || userRole === "explorer") && (
+            <Link to="/marketplace">
+              <Button className="gradient-primary border-0 text-primary-foreground">
+                <BarChart3 className="h-4 w-4 me-1" />{t.dashboard.browseIdeas}
+              </Button>
+            </Link>
+          )}
         </div>
-      </div>
+      </motion.div>
 
       {dataLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
         <Tabs defaultValue={userRole === "entrepreneur" ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
-          <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4">
+          <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
             {userRole === "entrepreneur" && (
               <TabsTrigger value="ideas"><Lightbulb className="h-4 w-4 me-1" />{t.dashboard.myIdeas}</TabsTrigger>
             )}
             {(userRole === "investor" || userRole === "explorer") && (
               <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
             )}
+            <TabsTrigger value="access"><Lock className="h-4 w-4 me-1" />{t.dashboard.accessRequests}</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 me-1" />{t.dashboard.messages}</TabsTrigger>
           </TabsList>
 
@@ -130,36 +169,39 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-3">
                   {myIdeas.map(idea => (
-                    <Link key={idea.id} to={`/idea/${idea.id}`}
-                      className="flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                        <div>
-                          <span className="font-medium text-foreground">{idea.title}</span>
-                          <div className="flex items-center gap-2 mt-0.5">
+                    <motion.div key={idea.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className="flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/idea/${idea.id}`)}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Sparkles className="h-5 w-5 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <span className="font-medium text-foreground block truncate">{idea.title}</span>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <Badge variant="secondary" className="text-xs">{idea.sector}</Badge>
-                            <span className="text-xs text-muted-foreground">{new Date(idea.created_at).toLocaleDateString()}</span>
+                            {getDecisionBadge(idea.decision)}
+                            {idea.evaluation_version > 1 && (
+                              <Badge variant="outline" className="text-xs"><RotateCcw className="h-3 w-3 me-1" />v{idea.evaluation_version}</Badge>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <div className="text-end">
                           <div className="flex items-center gap-1 text-sm">
                             <TrendingUp className="h-3.5 w-3.5 text-primary" />
                             <span className="font-semibold text-foreground">{idea.ai_score}</span>
                           </div>
-                          <span className="text-xs text-muted-foreground">{t.marketplace.aiScore}</span>
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                    </Link>
+                    </motion.div>
                   ))}
                 </div>
               )}
             </TabsContent>
           )}
 
-          {/* Investor/Explorer: Saved Ideas */}
+          {/* Investor: Saved Ideas */}
           {(userRole === "investor" || userRole === "explorer") && (
             <TabsContent value="saved" className="p-6">
               {savedIdeas.length === 0 ? (
@@ -193,6 +235,44 @@ export default function Dashboard() {
               )}
             </TabsContent>
           )}
+
+          {/* Access Requests */}
+          <TabsContent value="access" className="p-6">
+            {accessRequests.length === 0 ? (
+              <div className="text-center py-12">
+                <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">{t.dashboard.noAccessRequests}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {accessRequests.map(req => (
+                  <div key={req.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-5 w-5 text-primary" />
+                      <div>
+                        <span className="text-sm font-medium text-foreground">
+                          {userRole === "entrepreneur" ? `Investor requested access` : `Access request`}
+                        </span>
+                        <div className="text-xs text-muted-foreground mt-0.5">{new Date(req.created_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {req.status === "pending" && userRole === "entrepreneur" ? (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "approved")} className="text-primary border-primary/30">{t.dashboard.approve}</Button>
+                          <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "rejected")} className="text-destructive border-destructive/30">{t.dashboard.reject}</Button>
+                        </>
+                      ) : (
+                        <Badge variant={req.status === "approved" ? "default" : req.status === "rejected" ? "destructive" : "outline"}>
+                          {req.status === "approved" ? t.dashboard.approve : req.status === "rejected" ? t.dashboard.reject : t.dashboard.pending}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
           {/* Messages */}
           <TabsContent value="messages" className="p-6">

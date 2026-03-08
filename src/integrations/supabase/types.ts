@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_requests: {
+        Row: {
+          created_at: string
+          founder_id: string
+          id: string
+          idea_id: string
+          investor_id: string
+          message: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          founder_id: string
+          id?: string
+          idea_id: string
+          investor_id: string
+          message?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          founder_id?: string
+          id?: string
+          idea_id?: string
+          investor_id?: string
+          message?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_requests_founder_id_fkey"
+            columns: ["founder_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_requests_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_requests_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_history: {
         Row: {
           content: string
@@ -42,19 +97,25 @@ export type Database = {
         Row: {
           additional_info: string | null
           ai_evaluation: string | null
+          ai_recommendations: string | null
           ai_score: number | null
           capital_required: string
           competitive_advantage: string
           competitors: string
           created_at: string
+          decision: string | null
           description: string
+          evaluation_version: number
+          execution_score: number | null
           expected_revenue: string
           founder_id: string
           id: string
           innovation_score: number | null
+          investment_score: number | null
           location: string
           market_score: number | null
           risk_score: number | null
+          score_history: Json | null
           sector: string
           status: string
           target_audience: string
@@ -67,19 +128,25 @@ export type Database = {
         Insert: {
           additional_info?: string | null
           ai_evaluation?: string | null
+          ai_recommendations?: string | null
           ai_score?: number | null
           capital_required?: string
           competitive_advantage?: string
           competitors?: string
           created_at?: string
+          decision?: string | null
           description: string
+          evaluation_version?: number
+          execution_score?: number | null
           expected_revenue?: string
           founder_id: string
           id?: string
           innovation_score?: number | null
+          investment_score?: number | null
           location?: string
           market_score?: number | null
           risk_score?: number | null
+          score_history?: Json | null
           sector: string
           status?: string
           target_audience?: string
@@ -92,19 +159,25 @@ export type Database = {
         Update: {
           additional_info?: string | null
           ai_evaluation?: string | null
+          ai_recommendations?: string | null
           ai_score?: number | null
           capital_required?: string
           competitive_advantage?: string
           competitors?: string
           created_at?: string
+          decision?: string | null
           description?: string
+          evaluation_version?: number
+          execution_score?: number | null
           expected_revenue?: string
           founder_id?: string
           id?: string
           innovation_score?: number | null
+          investment_score?: number | null
           location?: string
           market_score?: number | null
           risk_score?: number | null
+          score_history?: Json | null
           sector?: string
           status?: string
           target_audience?: string
