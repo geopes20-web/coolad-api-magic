@@ -7,7 +7,7 @@ import { Brain, ShieldCheck, TrendingUp, Users, Sparkles, ArrowRight, Zap, Targe
 const stagger = { animate: { transition: { staggerChildren: 0.1 } } };
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
 };
 
 export default function Landing() {
