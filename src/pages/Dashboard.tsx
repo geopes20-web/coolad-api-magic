@@ -248,7 +248,7 @@ export default function Dashboard() {
                       <Lock className="h-5 w-5 text-primary" />
                       <div>
                         <span className="text-sm font-medium text-foreground">
-                          {userRole === "entrepreneur"
+                          {user.id === req.founder_id
                             ? `${req.investor_profile?.full_name || "مستثمر"} — ${req.idea_title || "فكرة"}`
                             : `${req.idea_title || "Access request"}`}
                         </span>
@@ -256,7 +256,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {req.status === "pending" && userRole === "entrepreneur" ? (
+                      {req.status === "pending" && user.id === req.founder_id ? (
                         <>
                           <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "approved")} className="text-primary border-primary/30">{t.dashboard.approve}</Button>
                           <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "rejected")} className="text-destructive border-destructive/30">{t.dashboard.reject}</Button>
