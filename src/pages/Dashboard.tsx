@@ -157,8 +157,7 @@ export default function Dashboard() {
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 me-1" />{t.dashboard.messages}</TabsTrigger>
           </TabsList>
 
-          {/* Entrepreneur: My Ideas */}
-          {userRole === "entrepreneur" && (
+          {myIdeas.length > 0 && (
             <TabsContent value="ideas" className="p-6">
               {myIdeas.length === 0 ? (
                 <div className="text-center py-12">
