@@ -12,8 +12,9 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, CheckCircle, AlertTriangle, XCircle,
+  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface IdeaData {
   id: string; title: string; description: string; sector: string; location: string;
@@ -32,6 +33,7 @@ export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [idea, setIdea] = useState<IdeaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -144,7 +146,13 @@ export default function IdeaDetail() {
                   <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">{t.ideaDetail.accessRequested}</Badge>
                 )}
                 {accessStatus === "approved" && (
-                  <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.accessApproved}</Badge>
+                  <>
+                    <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.accessApproved}</Badge>
+                    <Button size="sm" onClick={() => navigate(`/chat-founder/${idea.founder_id}?name=${encodeURIComponent(idea.profiles?.full_name || "—")}&ideaId=${id}`)}
+                      className="gradient-primary border-0 text-primary-foreground">
+                      <MessageCircle className="h-4 w-4 me-1" />{t.ideaDetail.chatWithFounder}
+                    </Button>
+                  </>
                 )}
               </>
             )}

@@ -19,6 +19,7 @@ import SubmitIdea from "@/pages/SubmitIdea";
 import Marketplace from "@/pages/Marketplace";
 import IdeaDetail from "@/pages/IdeaDetail";
 import AiChat from "@/pages/AiChat";
+import ChatWithFounder from "@/pages/ChatWithFounder";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 
@@ -35,6 +36,7 @@ function AnimatedRoutes() {
         <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
         <Route path="/idea/:id" element={<PageTransition><IdeaDetail /></PageTransition>} />
         <Route path="/chat" element={<PageTransition><AiChat /></PageTransition>} />
+        <Route path="/chat-founder/:founderId" element={<PageTransition><ChatWithFounder /></PageTransition>} />
         <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
         <Route path="/register" element={<PageTransition><Register /></PageTransition>} />
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
