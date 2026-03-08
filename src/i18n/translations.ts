@@ -232,7 +232,7 @@ export const translations: Record<Language, TranslationShape> = {
       signUp: "إنشاء حساب", signIn: "تسجيل الدخول",
       resetLink: "إرسال رابط إعادة التعيين",
       newPassword: "كلمة المرور الجديدة", updatePassword: "تحديث كلمة المرور",
-      checkEmail: "تحقق من بريدك الإلكتروني لرابط التأكيد.",
+      checkEmail: "تم إنشاء الحساب بنجاح! أنت الآن مسجل الدخول.",
       resetSent: "تحقق من بريدك الإلكتروني لرابط إعادة التعيين.",
       passwordUpdated: "تم تحديث كلمة المرور بنجاح.",
     },
