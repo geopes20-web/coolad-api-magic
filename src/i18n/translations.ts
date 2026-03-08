@@ -59,24 +59,20 @@ interface MarketplaceTranslations {
   viewDetails: string; by: string;
   sortBy: string; newest: string; highestScore: string; lowestRisk: string;
 }
-interface IdeaDetailTranslations {
-  overview: string; aiEvaluation: string; marketAnalysis: string;
-  financialPotential: string; riskAnalysis: string; team: string;
-  investBtn: string; saveBtn: string; savedBtn: string; contactFounder: string;
-  capitalRequired: string; expectedRevenue: string; targetAudience: string;
-  competitiveAdvantage: string; competitors: string; timeline: string;
-  teamSize: string; teamExperience: string;
-  scores: string; overallScore: string; marketPotential: string;
-  innovationLevel: string; riskLevel: string;
-  notFound: string; backToMarketplace: string;
-  founder: string; postedOn: string;
+interface ChatTranslations {
+  subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
+  suggestion1: string; suggestion2: string; suggestion3: string; suggestion4: string;
+}
+interface DashboardTranslations {
+  myIdeas: string; savedIdeas: string; messages: string; noIdeas: string;
+  noSaved: string; noMessages: string; newIdea: string; browseIdeas: string;
 }
 
 export interface TranslationShape {
   nav: NavTranslations; hero: HeroTranslations; features: FeaturesTranslations;
   stats: StatsTranslations; auth: AuthTranslations; footer: FooterTranslations;
   common: CommonTranslations; submit: SubmitTranslations; marketplace: MarketplaceTranslations;
-  ideaDetail: IdeaDetailTranslations;
+  ideaDetail: IdeaDetailTranslations; chat: ChatTranslations; dashboard: DashboardTranslations;
 }
 
 export const translations: Record<Language, TranslationShape> = {
