@@ -131,6 +131,9 @@ export default function IdeaDetail() {
             </div>
           </div>
           <div className="flex gap-2 shrink-0 flex-wrap">
+            {user && isOwner && (
+              <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.yourIdea || "Your Idea"}</Badge>
+            )}
             {user && !isOwner && (
               <>
                 <Button variant="outline" size="sm" onClick={toggleSave}>
@@ -138,7 +141,7 @@ export default function IdeaDetail() {
                   {saved ? t.ideaDetail.savedBtn : t.ideaDetail.saveBtn}
                 </Button>
                 {!accessStatus && (
-                  <Button variant="outline" size="sm" onClick={requestAccess}>
+                  <Button size="sm" onClick={requestAccess} className="gradient-primary border-0 text-primary-foreground">
                     <Lock className="h-4 w-4 me-1" />{t.ideaDetail.requestAccess}
                   </Button>
                 )}
@@ -155,6 +158,13 @@ export default function IdeaDetail() {
                   </>
                 )}
               </>
+            )}
+            {!user && (
+              <Link to="/login">
+                <Button size="sm" className="gradient-primary border-0 text-primary-foreground">
+                  <Lock className="h-4 w-4 me-1" />{t.auth.signIn}
+                </Button>
+              </Link>
             )}
           </div>
         </div>

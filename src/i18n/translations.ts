@@ -81,6 +81,7 @@ interface IdeaDetailTranslations {
   recommendations: string;
   executionScore: string; investmentScore: string;
   decision: string;
+  yourIdea: string;
 }
 interface ChatTranslations {
   subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
@@ -203,6 +204,7 @@ export const translations: Record<Language, TranslationShape> = {
       recommendations: "AI Recommendations",
       executionScore: "Execution", investmentScore: "Investment",
       decision: "AI Decision",
+      yourIdea: "Your Idea",
     },
     chat: {
       subtitle: "Your AI startup mentor", clear: "Clear", empty: "Start a conversation with your AI mentor",
@@ -328,6 +330,7 @@ export const translations: Record<Language, TranslationShape> = {
       recommendations: "توصيات AI",
       executionScore: "التنفيذ", investmentScore: "الاستثمار",
       decision: "قرار AI",
+      yourIdea: "فكرتك",
     },
     chat: {
       subtitle: "مرشدك الذكي للشركات الناشئة", clear: "مسح", empty: "ابدأ محادثة مع مرشدك الذكي",
