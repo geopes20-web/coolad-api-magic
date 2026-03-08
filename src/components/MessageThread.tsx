@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, ShieldAlert } from "lucide-react";
+import { containsExternalContact, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 
 interface Message {
   id: string;
