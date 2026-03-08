@@ -232,7 +232,6 @@ export default function Dashboard() {
                 </div>
               )}
             </TabsContent>
-          )}
 
           {/* Access Requests */}
           <TabsContent value="access" className="p-6">
