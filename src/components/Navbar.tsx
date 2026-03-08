@@ -15,6 +15,7 @@ import { Globe, Menu, X, User, LogOut, LayoutDashboard, Sparkles, Moon, Sun } fr
 export default function Navbar() {
   const { t, language, setLanguage } = useLanguage();
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
