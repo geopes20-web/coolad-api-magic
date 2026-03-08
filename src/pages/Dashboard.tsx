@@ -58,11 +58,18 @@ export default function Dashboard() {
             .eq("founder_id", user.id).order("created_at", { ascending: false })
             .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
         );
-        // Access requests for entrepreneur's ideas
+        // Access requests for entrepreneur's ideas - join investor profile and idea title
         promises.push(
-          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at")
+          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at, profiles!access_requests_investor_id_fkey(full_name), ideas!access_requests_idea_id_fkey(title)")
             .eq("founder_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setAccessRequests((data as unknown as AccessRequestRow[]) || []); }) as unknown as Promise<void>
+            .then(({ data }) => {
+              const mapped = (data || []).map((r: any) => ({
+                ...r,
+                investor_profile: r.profiles || null,
+                idea_title: r.ideas?.title || "",
+              }));
+              setAccessRequests(mapped as AccessRequestRow[]);
+            }) as unknown as Promise<void>
         );
       }
 
