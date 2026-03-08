@@ -13,7 +13,9 @@ import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
-import Index from "@/pages/Index";
+import SubmitIdea from "@/pages/SubmitIdea";
+import Marketplace from "@/pages/Marketplace";
+import IdeaDetail from "@/pages/IdeaDetail";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,7 +31,9 @@ const App = () => (
             <Navbar />
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/submit" element={<Index />} />
+              <Route path="/submit" element={<SubmitIdea />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/idea/:id" element={<IdeaDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />

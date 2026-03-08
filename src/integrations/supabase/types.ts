@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      ideas: {
+        Row: {
+          additional_info: string | null
+          ai_evaluation: string | null
+          ai_score: number | null
+          capital_required: string
+          competitive_advantage: string
+          competitors: string
+          created_at: string
+          description: string
+          expected_revenue: string
+          founder_id: string
+          id: string
+          innovation_score: number | null
+          location: string
+          market_score: number | null
+          risk_score: number | null
+          sector: string
+          status: string
+          target_audience: string
+          team_experience: string
+          team_size: string
+          timeline: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          additional_info?: string | null
+          ai_evaluation?: string | null
+          ai_score?: number | null
+          capital_required?: string
+          competitive_advantage?: string
+          competitors?: string
+          created_at?: string
+          description: string
+          expected_revenue?: string
+          founder_id: string
+          id?: string
+          innovation_score?: number | null
+          location?: string
+          market_score?: number | null
+          risk_score?: number | null
+          sector: string
+          status?: string
+          target_audience?: string
+          team_experience?: string
+          team_size?: string
+          timeline?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          additional_info?: string | null
+          ai_evaluation?: string | null
+          ai_score?: number | null
+          capital_required?: string
+          competitive_advantage?: string
+          competitors?: string
+          created_at?: string
+          description?: string
+          expected_revenue?: string
+          founder_id?: string
+          id?: string
+          innovation_score?: number | null
+          location?: string
+          market_score?: number | null
+          risk_score?: number | null
+          sector?: string
+          status?: string
+          target_audience?: string
+          team_experience?: string
+          team_size?: string
+          timeline?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -40,6 +118,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      saved_ideas: {
+        Row: {
+          created_at: string
+          id: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_ideas_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
