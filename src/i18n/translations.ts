@@ -59,6 +59,18 @@ interface MarketplaceTranslations {
   viewDetails: string; by: string;
   sortBy: string; newest: string; highestScore: string; lowestRisk: string;
 }
+interface IdeaDetailTranslations {
+  overview: string; aiEvaluation: string; marketAnalysis: string;
+  financialPotential: string; riskAnalysis: string; team: string;
+  investBtn: string; saveBtn: string; savedBtn: string; contactFounder: string;
+  capitalRequired: string; expectedRevenue: string; targetAudience: string;
+  competitiveAdvantage: string; competitors: string; timeline: string;
+  teamSize: string; teamExperience: string;
+  scores: string; overallScore: string; marketPotential: string;
+  innovationLevel: string; riskLevel: string;
+  notFound: string; backToMarketplace: string;
+  founder: string; postedOn: string;
+}
 interface ChatTranslations {
   subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
   suggestion1: string; suggestion2: string; suggestion3: string; suggestion4: string;
