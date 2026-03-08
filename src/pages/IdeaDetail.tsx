@@ -50,6 +50,10 @@ export default function IdeaDetail() {
 
         const { data: accessData } = await supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as { data: { status: string } | null };
         setAccessStatus(accessData?.status || null);
+      }
+    };
+    load();
+  }, [id, user]);
 
   const toggleSave = async () => {
     if (!user || !id) return;
