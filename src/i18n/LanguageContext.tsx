@@ -5,7 +5,7 @@ import { translations, type Language, type TranslationShape } from "./translatio
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: TranslationValues;
+  t: TranslationShape;
   dir: "ltr" | "rtl";
 }
 
