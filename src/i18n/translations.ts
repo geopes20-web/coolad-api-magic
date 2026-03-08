@@ -172,6 +172,6 @@ export const translations: Record<Language, TranslationShape> = {
       back: "رجوع",
     },
   },
-} as const;
+};
 
-export type TranslationKeys = typeof translations.en;
+export type TranslationKeys = TranslationShape;
