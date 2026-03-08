@@ -41,7 +41,7 @@ Be conversational, helpful, and specific. Give actionable advice. If asked about
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5",
+        model: "google/gemini-3-flash-preview",
         messages: allMessages,
         stream: true,
       }),
