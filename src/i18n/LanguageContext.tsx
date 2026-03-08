@@ -1,7 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { translations, type Language } from "./translations";
-
-type TranslationValues = typeof translations["en"];
+import { translations, type Language, type TranslationShape } from "./translations";
 
 
 interface LanguageContextType {
