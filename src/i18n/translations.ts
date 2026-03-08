@@ -1,5 +1,41 @@
 export type Language = "en" | "ar";
 
+interface NavTranslations {
+  home: string; marketplace: string; submit: string; chat: string;
+  dashboard: string; login: string; profile: string; logout: string;
+}
+interface HeroTranslations {
+  badge: string; title1: string; title2: string; subtitle: string; cta1: string; cta2: string;
+}
+interface FeaturesTranslations {
+  title: string; subtitle: string; aiEval: string; aiEvalDesc: string;
+  marketplace: string; marketplaceDesc: string; mentor: string; mentorDesc: string;
+  risk: string; riskDesc: string;
+}
+interface StatsTranslations { ideas: string; investors: string; funded: string; }
+interface AuthTranslations {
+  login: string; register: string; forgotPassword: string; resetPassword: string;
+  email: string; password: string; confirmPassword: string; fullName: string;
+  role: string; entrepreneur: string; investor: string; explorer: string;
+  entrepreneurDesc: string; investorDesc: string; explorerDesc: string;
+  noAccount: string; hasAccount: string; signUp: string; signIn: string;
+  resetLink: string; newPassword: string; updatePassword: string;
+  checkEmail: string; resetSent: string; passwordUpdated: string;
+}
+interface FooterTranslations {
+  description: string; product: string; company: string; about: string;
+  blog: string; careers: string; contact: string; rights: string;
+}
+interface CommonTranslations {
+  loading: string; error: string; success: string; save: string; cancel: string; back: string;
+}
+
+export interface TranslationShape {
+  nav: NavTranslations; hero: HeroTranslations; features: FeaturesTranslations;
+  stats: StatsTranslations; auth: AuthTranslations; footer: FooterTranslations;
+  common: CommonTranslations;
+}
+
 export const translations: Record<Language, TranslationShape> = {
   en: {
     // Nav
