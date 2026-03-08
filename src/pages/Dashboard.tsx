@@ -262,9 +262,21 @@ export default function Dashboard() {
                           <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "rejected")} className="text-destructive border-destructive/30">{t.dashboard.reject}</Button>
                         </>
                       ) : (
-                        <Badge variant={req.status === "approved" ? "default" : req.status === "rejected" ? "destructive" : "outline"}>
-                          {req.status === "approved" ? t.dashboard.approve : req.status === "rejected" ? t.dashboard.reject : t.dashboard.pending}
-                        </Badge>
+                        <>
+                          <Badge variant={req.status === "approved" ? "default" : req.status === "rejected" ? "destructive" : "outline"}>
+                            {req.status === "approved" ? t.dashboard.approve : req.status === "rejected" ? t.dashboard.reject : t.dashboard.pending}
+                          </Badge>
+                          {req.status === "approved" && (
+                            <Button size="sm" variant="outline" className="text-primary border-primary/30"
+                              onClick={() => {
+                                const otherId = user.id === req.founder_id ? req.investor_id : req.founder_id;
+                                const otherName = user.id === req.founder_id ? (req.investor_profile?.full_name || "مستثمر") : (req.idea_title || "مؤسس");
+                                navigate(`/chat-founder/${otherId}?name=${encodeURIComponent(otherName)}&ideaId=${req.idea_id}`);
+                              }}>
+                              <MessageSquare className="h-3.5 w-3.5 me-1" />{t.dashboard.messages}
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
