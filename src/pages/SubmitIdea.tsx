@@ -192,6 +192,7 @@ export default function SubmitIdea() {
             target_audience: form.targetAudience,
             timeline: form.timeline,
             additional_info: form.additionalInfo || "",
+            document_url: documentUrl,
             founder_id: user.id,
             ai_score: scores.overall,
             risk_score: scores.risk,
