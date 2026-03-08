@@ -81,6 +81,7 @@ interface IdeaDetailTranslations {
   recommendations: string;
   executionScore: string; investmentScore: string;
   decision: string;
+  yourIdea: string;
 }
 interface ChatTranslations {
   subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
