@@ -122,7 +122,8 @@ Be specific, data-driven, and actionable in all recommendations.`;
 - Competitive Advantage: ${projectData.competitiveAdvantage}
 - Target Audience: ${projectData.targetAudience}
 - Expected Timeline: ${projectData.timeline}
-${projectData.additionalInfo ? `- Additional Info: ${projectData.additionalInfo}` : ''}`;
+${projectData.additionalInfo ? `- Additional Info: ${projectData.additionalInfo}` : ''}
+${projectData.documentContent ? `\n--- ATTACHED DOCUMENT CONTENT ---\n${projectData.documentContent}\n--- END DOCUMENT ---` : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
