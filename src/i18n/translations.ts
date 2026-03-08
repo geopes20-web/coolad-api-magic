@@ -177,6 +177,22 @@ export const translations: Record<Language, TranslationShape> = {
       notFound: "Idea not found", backToMarketplace: "Back to Marketplace",
       founder: "Founder", postedOn: "Posted on",
     },
+    chat: {
+      subtitle: "Your AI startup mentor", clear: "Clear", empty: "Start a conversation with your AI mentor",
+      placeholder: "Ask about startup ideas, investments, strategies...",
+      thinking: "Thinking...",
+      suggestion1: "How do I validate my startup idea?",
+      suggestion2: "What makes a good pitch deck?",
+      suggestion3: "How to find the right investors?",
+      suggestion4: "Common startup mistakes to avoid",
+    },
+    dashboard: {
+      myIdeas: "My Ideas", savedIdeas: "Saved Ideas", messages: "Messages",
+      noIdeas: "You haven't submitted any ideas yet.",
+      noSaved: "You haven't saved any ideas yet.",
+      noMessages: "No messages yet.",
+      newIdea: "Submit New Idea", browseIdeas: "Browse Ideas",
+    },
   },
   ar: {
     nav: {
