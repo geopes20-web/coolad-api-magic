@@ -165,8 +165,9 @@ export default function SubmitIdea() {
     let fullResult = "";
 
     try {
+      const projectDataWithDoc = { ...form, documentContent: documentText };
       await streamEvaluation({
-        projectData: form,
+        projectData: projectDataWithDoc,
         onDelta: (chunk) => {
           fullResult += chunk;
           setEvaluationResult(prev => prev + chunk);
