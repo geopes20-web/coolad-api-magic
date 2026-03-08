@@ -33,6 +33,7 @@ export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [idea, setIdea] = useState<IdeaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
