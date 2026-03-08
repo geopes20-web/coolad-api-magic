@@ -55,8 +55,8 @@ export default function Register() {
     }
 
     setLoading(false);
-    toast({ title: t.common.success, description: t.auth.checkEmail });
-    navigate("/login");
+    toast({ title: t.common.success, description: t.auth.registerSuccess || "Account created successfully!" });
+    navigate("/dashboard");
   };
 
   return (
