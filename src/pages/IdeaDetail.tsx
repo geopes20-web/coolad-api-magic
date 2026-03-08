@@ -12,8 +12,9 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, CheckCircle, AlertTriangle, XCircle,
+  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface IdeaData {
   id: string; title: string; description: string; sector: string; location: string;
