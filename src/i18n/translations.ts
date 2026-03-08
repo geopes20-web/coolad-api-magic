@@ -172,6 +172,7 @@ export const translations: Record<Language, TranslationShape> = {
       editAndResubmit: "Edit & Resubmit",
       version: "Version",
       scoreHistory: "Score History",
+      document: "Project Documentation (optional)", documentDesc: "Upload a document (PDF, DOC, TXT) for AI to analyze alongside your idea", uploadDoc: "Upload Document",
     },
     marketplace: {
       title: "Startup Marketplace", subtitle: "AI-accepted startup ideas ready for investment",
