@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Globe, Menu, X, User, LogOut, LayoutDashboard, Sparkles, Moon, Sun } from "lucide-react";
+import { Globe, Menu, X, User, LogOut, LayoutDashboard, Zap, Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
   const { t, language, setLanguage } = useLanguage();
@@ -30,15 +30,13 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 glass border-b border-border/50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary-foreground" />
+            <Zap className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-foreground">Collada</span>
+          <span className="text-xl font-black text-foreground tracking-tight">IDEVEST</span>
         </Link>
 
-        {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
@@ -51,29 +49,14 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2">
-          {/* Theme toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="text-muted-foreground"
-          >
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
-
-          {/* Language toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-            className="text-muted-foreground"
-          >
+          <Button variant="ghost" size="icon" onClick={() => setLanguage(language === "en" ? "ar" : "en")} className="text-muted-foreground">
             <Globe className="h-4 w-4" />
           </Button>
 
-          {/* Auth */}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -83,29 +66,25 @@ export default function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => navigate("/dashboard")}>
-                  <LayoutDashboard className="h-4 w-4 me-2" />
-                  {t.nav.dashboard}
+                  <LayoutDashboard className="h-4 w-4 me-2" />{t.nav.dashboard}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="h-4 w-4 me-2" />
-                  {t.nav.logout}
+                  <LogOut className="h-4 w-4 me-2" />{t.nav.logout}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button size="sm" onClick={() => navigate("/login")} className="gradient-primary border-0 text-primary-foreground">
+            <Button size="sm" onClick={() => navigate("/login")} className="gradient-primary border-0 text-primary-foreground ms-1">
               {t.nav.login}
             </Button>
           )}
 
-          {/* Mobile toggle */}
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
       </div>
 
-      {/* Mobile Nav */}
       {mobileOpen && (
         <div className="md:hidden glass border-t border-border/50 px-4 py-3 space-y-1">
           {navLinks.map((link) => (

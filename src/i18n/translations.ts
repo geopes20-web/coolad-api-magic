@@ -48,6 +48,10 @@ interface SubmitTranslations {
   loginRequired: string;
   successTitle: string; successDesc: string;
   evaluating: string;
+  resubmit: string; resubmitDesc: string;
+  editAndResubmit: string;
+  version: string;
+  scoreHistory: string;
 }
 interface MarketplaceTranslations {
   title: string; subtitle: string;
@@ -58,6 +62,7 @@ interface MarketplaceTranslations {
   aiScore: string; riskScore: string; marketScore: string;
   viewDetails: string; by: string;
   sortBy: string; newest: string; highestScore: string; lowestRisk: string;
+  accepted: string;
 }
 interface IdeaDetailTranslations {
   overview: string; aiEvaluation: string; marketAnalysis: string;
@@ -70,6 +75,11 @@ interface IdeaDetailTranslations {
   innovationLevel: string; riskLevel: string;
   notFound: string; backToMarketplace: string;
   founder: string; postedOn: string;
+  requestAccess: string; accessRequested: string; accessApproved: string;
+  chatWithFounder: string;
+  recommendations: string;
+  executionScore: string; investmentScore: string;
+  decision: string;
 }
 interface ChatTranslations {
   subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
@@ -78,6 +88,11 @@ interface ChatTranslations {
 interface DashboardTranslations {
   myIdeas: string; savedIdeas: string; messages: string; noIdeas: string;
   noSaved: string; noMessages: string; newIdea: string; browseIdeas: string;
+  accessRequests: string; noAccessRequests: string;
+  approve: string; reject: string; pending: string;
+  recommended: string; conversations: string;
+  accepted: string; needsImprovement: string; rejected: string;
+  resubmit: string;
 }
 
 export interface TranslationShape {
@@ -90,28 +105,28 @@ export interface TranslationShape {
 export const translations: Record<Language, TranslationShape> = {
   en: {
     nav: {
-      home: "Home", marketplace: "Idea Marketplace", submit: "Submit Idea",
-      chat: "AI Chat", dashboard: "Dashboard", login: "Login", profile: "Profile", logout: "Logout",
+      home: "Home", marketplace: "Marketplace", submit: "Submit Idea",
+      chat: "AI Mentor", dashboard: "Dashboard", login: "Login", profile: "Profile", logout: "Logout",
     },
     hero: {
-      badge: "AI-Powered Platform", title1: "Turn your idea into",
-      title2: "the next big startup",
-      subtitle: "Submit your startup idea, get AI-powered evaluation, and connect with investors ready to fund the next big thing.",
-      cta1: "Submit Idea", cta2: "Explore Ideas",
+      badge: "AI-Powered Investment Platform", title1: "Where great ideas",
+      title2: "meet smart capital",
+      subtitle: "Submit your startup idea, get AI-powered evaluation with actionable scores, and connect with investors ready to fund the next big thing.",
+      cta1: "Submit Your Idea", cta2: "Explore Marketplace",
     },
     features: {
-      title: "Everything you need to launch",
-      subtitle: "From idea validation to investor connections — all powered by AI",
-      aiEval: "AI Startup Evaluation",
-      aiEvalDesc: "Get comprehensive AI analysis of your startup idea across market potential, risks, and financial viability.",
-      marketplace: "Investor Marketplace",
-      marketplaceDesc: "Connect with verified investors actively looking for promising startup ideas to fund.",
+      title: "The smarter way to invest & build",
+      subtitle: "AI-driven evaluation, marketplace discovery, and founder-investor connection",
+      aiEval: "AI Evaluation Engine",
+      aiEvalDesc: "Get scored across Innovation, Market, Execution, Investment, and Risk — with a clear ACCEPT / IMPROVE / REJECT decision.",
+      marketplace: "Curated Marketplace",
+      marketplaceDesc: "Only AI-accepted ideas appear. Investors browse pre-validated startups with proven potential.",
       mentor: "AI Startup Mentor",
-      mentorDesc: "Chat with an AI mentor that understands your idea and helps you refine your pitch and strategy.",
-      risk: "Smart Risk Analysis",
-      riskDesc: "Identify potential risks early and get actionable mitigation strategies powered by AI.",
+      mentorDesc: "Chat with an AI that understands your idea and helps you iterate until you get accepted.",
+      risk: "Improvement Roadmap",
+      riskDesc: "Get specific recommendations with expected score improvements to upgrade your idea.",
     },
-    stats: { ideas: "Ideas Analyzed", investors: "Active Investors", funded: "Funded Ideas" },
+    stats: { ideas: "Ideas Evaluated", investors: "Active Investors", funded: "Ideas Accepted" },
     auth: {
       login: "Sign in", register: "Create account", forgotPassword: "Forgot password?",
       resetPassword: "Reset password", email: "Email", password: "Password",
@@ -128,13 +143,13 @@ export const translations: Record<Language, TranslationShape> = {
       passwordUpdated: "Password updated successfully.",
     },
     footer: {
-      description: "AI-powered startup idea marketplace and evaluation platform.",
+      description: "AI-powered startup evaluation and investment marketplace. Where ideas meet capital.",
       product: "Product", company: "Company", about: "About", blog: "Blog",
       careers: "Careers", contact: "Contact", rights: "All rights reserved.",
     },
     common: { loading: "Loading...", error: "Error", success: "Success", save: "Save", cancel: "Cancel", back: "Back" },
     submit: {
-      title: "Submit Your Idea", subtitle: "Fill in the details and let AI evaluate your startup idea",
+      title: "Submit Your Idea", subtitle: "Fill in the details and let IDEVEST AI evaluate your startup idea",
       name: "Idea Name", namePh: "e.g. Smart Food Delivery Platform",
       description: "Description", descriptionPh: "Describe your idea in detail...",
       sector: "Sector / Industry", sectorPh: "e.g. Technology, Real Estate, Food...",
@@ -150,11 +165,15 @@ export const translations: Record<Language, TranslationShape> = {
       additional: "Additional Info (optional)", additionalPh: "Any other details...",
       submitBtn: "Evaluate with AI", submitting: "Evaluating...",
       loginRequired: "Please login to submit an idea.",
-      successTitle: "Idea Submitted!", successDesc: "Your idea has been evaluated and saved.",
-      evaluating: "AI is analyzing your idea...",
+      successTitle: "Idea Evaluated!", successDesc: "Your idea has been evaluated and saved.",
+      evaluating: "IDEVEST AI is analyzing your idea...",
+      resubmit: "Resubmit Idea", resubmitDesc: "Apply improvements and get re-evaluated",
+      editAndResubmit: "Edit & Resubmit",
+      version: "Version",
+      scoreHistory: "Score History",
     },
     marketplace: {
-      title: "Idea Marketplace", subtitle: "Discover AI-validated startup ideas ready for investment",
+      title: "Startup Marketplace", subtitle: "AI-accepted startup ideas ready for investment",
       search: "Search", searchPh: "Search ideas by name, sector...",
       filterSector: "Sector", filterCapital: "Investment Size", filterLocation: "Location", filterRating: "AI Rating",
       allSectors: "All Sectors", allLocations: "All Locations", allRatings: "All Ratings", allCapital: "All Sizes",
@@ -162,10 +181,11 @@ export const translations: Record<Language, TranslationShape> = {
       aiScore: "AI Score", riskScore: "Risk", marketScore: "Market",
       viewDetails: "View Details", by: "by",
       sortBy: "Sort by", newest: "Newest", highestScore: "Highest Score", lowestRisk: "Lowest Risk",
+      accepted: "AI Accepted",
     },
     ideaDetail: {
-      overview: "Overview", aiEvaluation: "AI Evaluation", marketAnalysis: "Market Analysis",
-      financialPotential: "Financial Potential", riskAnalysis: "Risk Analysis", team: "Team",
+      overview: "Overview", aiEvaluation: "AI Report", marketAnalysis: "Market Analysis",
+      financialPotential: "Financials", riskAnalysis: "Risk Analysis", team: "Team",
       investBtn: "Express Interest", saveBtn: "Save Idea", savedBtn: "Saved",
       contactFounder: "Contact Founder",
       capitalRequired: "Capital Required", expectedRevenue: "Expected Revenue",
@@ -176,6 +196,11 @@ export const translations: Record<Language, TranslationShape> = {
       innovationLevel: "Innovation", riskLevel: "Risk Level",
       notFound: "Idea not found", backToMarketplace: "Back to Marketplace",
       founder: "Founder", postedOn: "Posted on",
+      requestAccess: "Request Full Access", accessRequested: "Access Requested", accessApproved: "Full Access Granted",
+      chatWithFounder: "Chat with Founder",
+      recommendations: "AI Recommendations",
+      executionScore: "Execution", investmentScore: "Investment",
+      decision: "AI Decision",
     },
     chat: {
       subtitle: "Your AI startup mentor", clear: "Clear", empty: "Start a conversation with your AI mentor",
@@ -191,34 +216,39 @@ export const translations: Record<Language, TranslationShape> = {
       noIdeas: "You haven't submitted any ideas yet.",
       noSaved: "You haven't saved any ideas yet.",
       noMessages: "No messages yet.",
-      newIdea: "Submit New Idea", browseIdeas: "Browse Ideas",
+      newIdea: "Submit New Idea", browseIdeas: "Browse Marketplace",
+      accessRequests: "Access Requests", noAccessRequests: "No access requests yet.",
+      approve: "Approve", reject: "Reject", pending: "Pending",
+      recommended: "Recommended Ideas", conversations: "Conversations",
+      accepted: "Accepted", needsImprovement: "Needs Improvement", rejected: "Rejected",
+      resubmit: "Resubmit",
     },
   },
   ar: {
     nav: {
-      home: "الرئيسية", marketplace: "سوق الأفكار", submit: "تقديم فكرة",
-      chat: "محادثة AI", dashboard: "لوحة التحكم", login: "تسجيل الدخول",
+      home: "الرئيسية", marketplace: "السوق", submit: "تقديم فكرة",
+      chat: "مرشد AI", dashboard: "لوحة التحكم", login: "تسجيل الدخول",
       profile: "الملف الشخصي", logout: "تسجيل الخروج",
     },
     hero: {
-      badge: "منصة مدعومة بالذكاء الاصطناعي", title1: "حوّل فكرتك إلى",
-      title2: "الشركة الناشئة القادمة",
-      subtitle: "قدّم فكرة شركتك الناشئة، احصل على تقييم بالذكاء الاصطناعي، وتواصل مع مستثمرين جاهزين لتمويل الأفكار الواعدة.",
-      cta1: "قدّم فكرة", cta2: "استكشف الأفكار",
+      badge: "منصة استثمار مدعومة بالذكاء الاصطناعي", title1: "حيث تلتقي الأفكار العظيمة",
+      title2: "برأس المال الذكي",
+      subtitle: "قدّم فكرة شركتك الناشئة، احصل على تقييم بالذكاء الاصطناعي مع درجات عملية، وتواصل مع مستثمرين جاهزين.",
+      cta1: "قدّم فكرتك", cta2: "استكشف السوق",
     },
     features: {
-      title: "كل ما تحتاجه للانطلاق",
-      subtitle: "من التحقق من الفكرة إلى التواصل مع المستثمرين — مدعوم بالذكاء الاصطناعي",
-      aiEval: "تقييم ذكي للشركات الناشئة",
-      aiEvalDesc: "احصل على تحليل شامل بالذكاء الاصطناعي لفكرتك من حيث السوق والمخاطر والجدوى المالية.",
-      marketplace: "سوق المستثمرين",
-      marketplaceDesc: "تواصل مع مستثمرين موثوقين يبحثون عن أفكار واعدة لتمويلها.",
+      title: "الطريقة الأذكى للاستثمار والبناء",
+      subtitle: "تقييم بالذكاء الاصطناعي، اكتشاف في السوق، وربط المؤسسين بالمستثمرين",
+      aiEval: "محرك التقييم الذكي",
+      aiEvalDesc: "احصل على تقييم عبر الابتكار والسوق والتنفيذ والاستثمار والمخاطر — مع قرار واضح: قبول / تحسين / رفض.",
+      marketplace: "سوق مختارة",
+      marketplaceDesc: "فقط الأفكار المقبولة تظهر. المستثمرون يتصفحون شركات ناشئة تم التحقق منها.",
       mentor: "مرشد AI للشركات الناشئة",
-      mentorDesc: "تحدث مع مرشد ذكي يفهم فكرتك ويساعدك في تحسين عرضك واستراتيجيتك.",
-      risk: "تحليل ذكي للمخاطر",
-      riskDesc: "حدد المخاطر المحتملة مبكراً واحصل على استراتيجيات عملية للتخفيف منها.",
+      mentorDesc: "تحدث مع ذكاء اصطناعي يفهم فكرتك ويساعدك في التكرار حتى القبول.",
+      risk: "خارطة طريق التحسين",
+      riskDesc: "احصل على توصيات محددة مع تحسينات متوقعة في الدرجات لترقية فكرتك.",
     },
-    stats: { ideas: "فكرة تم تحليلها", investors: "مستثمر نشط", funded: "فكرة ممولة" },
+    stats: { ideas: "فكرة تم تقييمها", investors: "مستثمر نشط", funded: "فكرة مقبولة" },
     auth: {
       login: "تسجيل الدخول", register: "إنشاء حساب", forgotPassword: "نسيت كلمة المرور؟",
       resetPassword: "إعادة تعيين كلمة المرور", email: "البريد الإلكتروني",
@@ -237,13 +267,13 @@ export const translations: Record<Language, TranslationShape> = {
       passwordUpdated: "تم تحديث كلمة المرور بنجاح.",
     },
     footer: {
-      description: "منصة سوق الأفكار الناشئة والتقييم بالذكاء الاصطناعي.",
+      description: "منصة تقييم الشركات الناشئة والاستثمار بالذكاء الاصطناعي. حيث تلتقي الأفكار برأس المال.",
       product: "المنتج", company: "الشركة", about: "عن المنصة", blog: "المدونة",
       careers: "الوظائف", contact: "تواصل معنا", rights: "جميع الحقوق محفوظة.",
     },
     common: { loading: "جاري التحميل...", error: "خطأ", success: "نجاح", save: "حفظ", cancel: "إلغاء", back: "رجوع" },
     submit: {
-      title: "قدّم فكرتك", subtitle: "املأ التفاصيل ودع الذكاء الاصطناعي يقيّم فكرة شركتك الناشئة",
+      title: "قدّم فكرتك", subtitle: "املأ التفاصيل ودع IDEVEST AI يقيّم فكرة شركتك الناشئة",
       name: "اسم الفكرة", namePh: "مثال: منصة توصيل طعام ذكية",
       description: "الوصف", descriptionPh: "اشرح فكرتك بالتفصيل...",
       sector: "القطاع / المجال", sectorPh: "مثال: تكنولوجيا، عقارات، غذاء...",
@@ -259,11 +289,15 @@ export const translations: Record<Language, TranslationShape> = {
       additional: "معلومات إضافية (اختياري)", additionalPh: "أي تفاصيل أخرى...",
       submitBtn: "قيّم بالذكاء الاصطناعي", submitting: "جاري التقييم...",
       loginRequired: "يرجى تسجيل الدخول لتقديم فكرة.",
-      successTitle: "تم تقديم الفكرة!", successDesc: "تم تقييم فكرتك وحفظها بنجاح.",
-      evaluating: "الذكاء الاصطناعي يحلل فكرتك...",
+      successTitle: "تم تقييم الفكرة!", successDesc: "تم تقييم فكرتك وحفظها بنجاح.",
+      evaluating: "IDEVEST AI يحلل فكرتك...",
+      resubmit: "إعادة تقديم الفكرة", resubmitDesc: "طبق التحسينات وأعد التقييم",
+      editAndResubmit: "تعديل وإعادة تقديم",
+      version: "الإصدار",
+      scoreHistory: "سجل الدرجات",
     },
     marketplace: {
-      title: "سوق الأفكار", subtitle: "اكتشف أفكار شركات ناشئة تم التحقق منها بالذكاء الاصطناعي",
+      title: "سوق الشركات الناشئة", subtitle: "أفكار مقبولة من الذكاء الاصطناعي جاهزة للاستثمار",
       search: "بحث", searchPh: "ابحث عن أفكار بالاسم أو القطاع...",
       filterSector: "القطاع", filterCapital: "حجم الاستثمار", filterLocation: "الموقع", filterRating: "تقييم AI",
       allSectors: "كل القطاعات", allLocations: "كل المواقع", allRatings: "كل التقييمات", allCapital: "كل الأحجام",
@@ -271,9 +305,10 @@ export const translations: Record<Language, TranslationShape> = {
       aiScore: "تقييم AI", riskScore: "المخاطر", marketScore: "السوق",
       viewDetails: "عرض التفاصيل", by: "بواسطة",
       sortBy: "ترتيب حسب", newest: "الأحدث", highestScore: "أعلى تقييم", lowestRisk: "أقل مخاطر",
+      accepted: "مقبول من AI",
     },
     ideaDetail: {
-      overview: "نظرة عامة", aiEvaluation: "تقييم AI", marketAnalysis: "تحليل السوق",
+      overview: "نظرة عامة", aiEvaluation: "تقرير AI", marketAnalysis: "تحليل السوق",
       financialPotential: "الإمكانات المالية", riskAnalysis: "تحليل المخاطر", team: "الفريق",
       investBtn: "أبدِ اهتمامك", saveBtn: "حفظ الفكرة", savedBtn: "تم الحفظ",
       contactFounder: "تواصل مع المؤسس",
@@ -283,8 +318,13 @@ export const translations: Record<Language, TranslationShape> = {
       teamSize: "حجم الفريق", teamExperience: "خبرة الفريق",
       scores: "تقييمات AI", overallScore: "التقييم العام", marketPotential: "إمكانات السوق",
       innovationLevel: "الابتكار", riskLevel: "مستوى المخاطر",
-      notFound: "الفكرة غير موجودة", backToMarketplace: "العودة لسوق الأفكار",
+      notFound: "الفكرة غير موجودة", backToMarketplace: "العودة للسوق",
       founder: "المؤسس", postedOn: "نُشرت في",
+      requestAccess: "طلب وصول كامل", accessRequested: "تم طلب الوصول", accessApproved: "تم منح الوصول الكامل",
+      chatWithFounder: "محادثة المؤسس",
+      recommendations: "توصيات AI",
+      executionScore: "التنفيذ", investmentScore: "الاستثمار",
+      decision: "قرار AI",
     },
     chat: {
       subtitle: "مرشدك الذكي للشركات الناشئة", clear: "مسح", empty: "ابدأ محادثة مع مرشدك الذكي",
@@ -300,7 +340,12 @@ export const translations: Record<Language, TranslationShape> = {
       noIdeas: "لم تقدم أي أفكار بعد.",
       noSaved: "لم تحفظ أي أفكار بعد.",
       noMessages: "لا توجد رسائل بعد.",
-      newIdea: "تقديم فكرة جديدة", browseIdeas: "تصفح الأفكار",
+      newIdea: "تقديم فكرة جديدة", browseIdeas: "تصفح السوق",
+      accessRequests: "طلبات الوصول", noAccessRequests: "لا توجد طلبات وصول بعد.",
+      approve: "قبول", reject: "رفض", pending: "قيد الانتظار",
+      recommended: "أفكار موصى بها", conversations: "المحادثات",
+      accepted: "مقبول", needsImprovement: "يحتاج تحسين", rejected: "مرفوض",
+      resubmit: "إعادة تقديم",
     },
   },
 };
