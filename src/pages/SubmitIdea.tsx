@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +15,7 @@ import { motion } from "framer-motion";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Users, Briefcase,
   Target, Clock, Shield, Sparkles, Loader2, ArrowRight, LogIn,
-  CheckCircle, AlertTriangle, XCircle, RotateCcw, Zap,
+  CheckCircle, AlertTriangle, XCircle, RotateCcw, Zap, FileUp, X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
