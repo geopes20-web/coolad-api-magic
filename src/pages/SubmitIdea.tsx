@@ -173,7 +173,7 @@ export default function SubmitIdea() {
             ai_evaluation: fullResult,
             evaluation_version: 1,
             score_history: JSON.stringify([{ version: 1, score: scores.overall, date: new Date().toISOString() }]),
-          } as Record<string, unknown>);
+          } as any);
 
           setIsLoading(false);
           if (error) {

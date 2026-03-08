@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import {
   Loader2, Rocket, DollarSign, Compass, Lightbulb, TrendingUp,
   MessageSquare, Bookmark, ArrowRight, Plus, Sparkles, BarChart3,
-  CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw, Zap,
+  CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw,
 } from "lucide-react";
 
 interface IdeaRow {

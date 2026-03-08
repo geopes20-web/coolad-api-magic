@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import IdeaCard from "@/components/IdeaCard";
 import { motion } from "framer-motion";
-import { Search, Loader2, Lightbulb, CheckCircle, Zap } from "lucide-react";
+import { Search, Loader2, Lightbulb, CheckCircle } from "lucide-react";
 
 interface IdeaRow {
   id: string; title: string; description: string; sector: string;
