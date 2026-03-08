@@ -22,7 +22,7 @@ interface IdeaRow {
 }
 
 interface AccessRequestRow {
-  id: string; idea_id: string; investor_id: string; status: string; created_at: string;
+  id: string; idea_id: string; investor_id: string; founder_id: string; status: string; created_at: string;
   investor_profile?: { full_name: string } | null;
   idea_title?: string;
 }
