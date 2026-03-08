@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, MessageSquare, CheckCircle, AlertTriangle, XCircle,
+  Lock, CheckCircle, AlertTriangle, XCircle,
 } from "lucide-react";
 
 interface IdeaData {
