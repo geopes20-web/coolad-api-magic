@@ -330,6 +330,7 @@ export const translations: Record<Language, TranslationShape> = {
       recommendations: "توصيات AI",
       executionScore: "التنفيذ", investmentScore: "الاستثمار",
       decision: "قرار AI",
+      yourIdea: "فكرتك",
     },
     chat: {
       subtitle: "مرشدك الذكي للشركات الناشئة", clear: "مسح", empty: "ابدأ محادثة مع مرشدك الذكي",
