@@ -178,9 +178,9 @@ export default function Dashboard() {
                           <span className="font-medium text-foreground block truncate">{idea.title}</span>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <Badge variant="secondary" className="text-xs">{idea.sector}</Badge>
-                            {getDecisionBadge((idea as Record<string, unknown>).decision as string)}
-                            {(idea as Record<string, unknown>).evaluation_version && (idea as Record<string, unknown>).evaluation_version as number > 1 && (
-                              <Badge variant="outline" className="text-xs"><RotateCcw className="h-3 w-3 me-1" />v{(idea as Record<string, unknown>).evaluation_version as number}</Badge>
+                            {getDecisionBadge(idea.decision)}
+                            {idea.evaluation_version > 1 && (
+                              <Badge variant="outline" className="text-xs"><RotateCcw className="h-3 w-3 me-1" />v{idea.evaluation_version}</Badge>
                             )}
                           </div>
                         </div>
