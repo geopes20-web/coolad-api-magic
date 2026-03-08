@@ -19,6 +19,7 @@ import SubmitIdea from "@/pages/SubmitIdea";
 import Marketplace from "@/pages/Marketplace";
 import IdeaDetail from "@/pages/IdeaDetail";
 import AiChat from "@/pages/AiChat";
+import ChatWithFounder from "@/pages/ChatWithFounder";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 
