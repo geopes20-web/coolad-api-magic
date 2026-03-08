@@ -7,7 +7,7 @@ type TranslationValues = typeof translations["en"];
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: TranslationKeys;
+  t: TranslationValues;
   dir: "ltr" | "rtl";
 }
 
