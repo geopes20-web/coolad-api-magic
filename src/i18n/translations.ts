@@ -123,7 +123,7 @@ export const translations: Record<Language, TranslationShape> = {
       noAccount: "Don't have an account?", hasAccount: "Already have an account?",
       signUp: "Sign up", signIn: "Sign in", resetLink: "Send reset link",
       newPassword: "New password", updatePassword: "Update password",
-      checkEmail: "Check your email for a verification link.",
+      checkEmail: "Account created successfully! You are now logged in.",
       resetSent: "Check your email for a password reset link.",
       passwordUpdated: "Password updated successfully.",
     },
