@@ -22,9 +22,10 @@ interface IdeaData {
   target_audience: string; timeline: string; additional_info: string;
   founder_id: string; ai_score: number; risk_score: number; market_score: number;
   innovation_score: number; ai_evaluation: string; created_at: string;
-  execution_score?: number; investment_score?: number; decision?: string;
-  ai_recommendations?: string;
+  execution_score: number; investment_score: number; decision: string;
+  ai_recommendations: string;
   profiles?: { full_name: string } | null;
+  [key: string]: unknown;
 }
 
 export default function IdeaDetail() {
