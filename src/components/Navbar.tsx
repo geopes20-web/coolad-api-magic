@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Globe, Menu, X, User, LogOut, LayoutDashboard, Sparkles } from "lucide-react";
+import { Globe, Menu, X, User, LogOut, LayoutDashboard, Sparkles, Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
   const { t, language, setLanguage } = useLanguage();
