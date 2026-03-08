@@ -252,13 +252,15 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {accessRequests.map(req => (
+              {accessRequests.map(req => (
                   <div key={req.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                     <div className="flex items-center gap-3">
                       <Lock className="h-5 w-5 text-primary" />
                       <div>
                         <span className="text-sm font-medium text-foreground">
-                          {userRole === "entrepreneur" ? `Investor requested access` : `Access request`}
+                          {userRole === "entrepreneur"
+                            ? `${req.investor_profile?.full_name || "مستثمر"} — ${req.idea_title || "فكرة"}`
+                            : `${req.idea_title || "Access request"}`}
                         </span>
                         <div className="text-xs text-muted-foreground mt-0.5">{new Date(req.created_at).toLocaleDateString()}</div>
                       </div>
