@@ -297,6 +297,7 @@ export const translations: Record<Language, TranslationShape> = {
       editAndResubmit: "تعديل وإعادة تقديم",
       version: "الإصدار",
       scoreHistory: "سجل الدرجات",
+      document: "مستند المشروع (اختياري)", documentDesc: "ارفع مستند (PDF, DOC, TXT) ليحلله الذكاء الاصطناعي مع تفاصيل فكرتك", uploadDoc: "رفع مستند",
     },
     marketplace: {
       title: "سوق الشركات الناشئة", subtitle: "أفكار مقبولة من الذكاء الاصطناعي جاهزة للاستثمار",

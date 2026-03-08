@@ -14,6 +14,7 @@ export interface ProjectData {
   targetAudience: string;
   timeline: string;
   additionalInfo?: string;
+  documentContent?: string;
 }
 
 export async function streamEvaluation({
