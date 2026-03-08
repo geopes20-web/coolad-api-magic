@@ -200,9 +200,8 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
-          {/* Investor: Saved Ideas */}
-          {(userRole === "investor" || userRole === "explorer") && (
-            <TabsContent value="saved" className="p-6">
+          {/* Saved Ideas */}
+          <TabsContent value="saved" className="p-6">
               {savedIdeas.length === 0 ? (
                 <div className="text-center py-12">
                   <Bookmark className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
