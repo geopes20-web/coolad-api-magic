@@ -55,7 +55,7 @@ export default function Register() {
     }
 
     setLoading(false);
-    toast({ title: t.common.success, description: t.auth.registerSuccess || "Account created successfully!" });
+    toast({ title: t.common.success, description: "Account created successfully!" });
     navigate("/dashboard");
   };
 
