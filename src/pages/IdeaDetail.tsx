@@ -70,7 +70,7 @@ export default function IdeaDetail() {
     if (!user || !id || !idea) return;
     const { error } = await supabase.from("access_requests").insert({
       investor_id: user.id, idea_id: id, founder_id: idea.founder_id,
-    } as Record<string, unknown>);
+    } as any);
     if (!error) {
       setAccessStatus("pending");
       toast({ title: t.common.success, description: t.ideaDetail.accessRequested });

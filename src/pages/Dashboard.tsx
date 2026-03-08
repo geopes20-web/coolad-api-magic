@@ -17,7 +17,8 @@ import {
 interface IdeaRow {
   id: string; title: string; sector: string; ai_score: number;
   risk_score: number; created_at: string; status: string;
-  decision?: string; evaluation_version?: number;
+  decision: string; evaluation_version: number;
+  [key: string]: unknown;
 }
 
 interface AccessRequestRow {
