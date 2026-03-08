@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, ShieldAlert } from "lucide-react";
+import { containsExternalContact, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 
 interface Message {
   id: string;
@@ -73,6 +74,17 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
 
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
+
+    // Check for external contact info
+    if (containsExternalContact(input)) {
+      toast({
+        title: "⚠️",
+        description: document.documentElement.lang === "ar" ? BLOCKED_MESSAGE_AR : BLOCKED_MESSAGE_EN,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSending(true);
     const { error } = await supabase.from("messages").insert({
       sender_id: user.id,

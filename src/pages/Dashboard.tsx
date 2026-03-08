@@ -58,11 +58,18 @@ export default function Dashboard() {
             .eq("founder_id", user.id).order("created_at", { ascending: false })
             .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
         );
-        // Access requests for entrepreneur's ideas
+        // Access requests for entrepreneur's ideas - join investor profile and idea title
         promises.push(
-          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at")
+          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at, profiles!access_requests_investor_id_fkey(full_name), ideas!access_requests_idea_id_fkey(title)")
             .eq("founder_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setAccessRequests((data as unknown as AccessRequestRow[]) || []); }) as unknown as Promise<void>
+            .then(({ data }) => {
+              const mapped = (data || []).map((r: any) => ({
+                ...r,
+                investor_profile: r.profiles || null,
+                idea_title: r.ideas?.title || "",
+              }));
+              setAccessRequests(mapped as AccessRequestRow[]);
+            }) as unknown as Promise<void>
         );
       }
 
@@ -245,13 +252,15 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {accessRequests.map(req => (
+              {accessRequests.map(req => (
                   <div key={req.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                     <div className="flex items-center gap-3">
                       <Lock className="h-5 w-5 text-primary" />
                       <div>
                         <span className="text-sm font-medium text-foreground">
-                          {userRole === "entrepreneur" ? `Investor requested access` : `Access request`}
+                          {userRole === "entrepreneur"
+                            ? `${req.investor_profile?.full_name || "مستثمر"} — ${req.idea_title || "فكرة"}`
+                            : `${req.idea_title || "Access request"}`}
                         </span>
                         <div className="text-xs text-muted-foreground mt-0.5">{new Date(req.created_at).toLocaleDateString()}</div>
                       </div>
