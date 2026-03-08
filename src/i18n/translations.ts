@@ -71,12 +71,20 @@ interface IdeaDetailTranslations {
   notFound: string; backToMarketplace: string;
   founder: string; postedOn: string;
 }
+interface ChatTranslations {
+  subtitle: string; clear: string; empty: string; placeholder: string; thinking: string;
+  suggestion1: string; suggestion2: string; suggestion3: string; suggestion4: string;
+}
+interface DashboardTranslations {
+  myIdeas: string; savedIdeas: string; messages: string; noIdeas: string;
+  noSaved: string; noMessages: string; newIdea: string; browseIdeas: string;
+}
 
 export interface TranslationShape {
   nav: NavTranslations; hero: HeroTranslations; features: FeaturesTranslations;
   stats: StatsTranslations; auth: AuthTranslations; footer: FooterTranslations;
   common: CommonTranslations; submit: SubmitTranslations; marketplace: MarketplaceTranslations;
-  ideaDetail: IdeaDetailTranslations;
+  ideaDetail: IdeaDetailTranslations; chat: ChatTranslations; dashboard: DashboardTranslations;
 }
 
 export const translations: Record<Language, TranslationShape> = {
@@ -168,6 +176,22 @@ export const translations: Record<Language, TranslationShape> = {
       innovationLevel: "Innovation", riskLevel: "Risk Level",
       notFound: "Idea not found", backToMarketplace: "Back to Marketplace",
       founder: "Founder", postedOn: "Posted on",
+    },
+    chat: {
+      subtitle: "Your AI startup mentor", clear: "Clear", empty: "Start a conversation with your AI mentor",
+      placeholder: "Ask about startup ideas, investments, strategies...",
+      thinking: "Thinking...",
+      suggestion1: "How do I validate my startup idea?",
+      suggestion2: "What makes a good pitch deck?",
+      suggestion3: "How to find the right investors?",
+      suggestion4: "Common startup mistakes to avoid",
+    },
+    dashboard: {
+      myIdeas: "My Ideas", savedIdeas: "Saved Ideas", messages: "Messages",
+      noIdeas: "You haven't submitted any ideas yet.",
+      noSaved: "You haven't saved any ideas yet.",
+      noMessages: "No messages yet.",
+      newIdea: "Submit New Idea", browseIdeas: "Browse Ideas",
     },
   },
   ar: {
@@ -261,6 +285,22 @@ export const translations: Record<Language, TranslationShape> = {
       innovationLevel: "الابتكار", riskLevel: "مستوى المخاطر",
       notFound: "الفكرة غير موجودة", backToMarketplace: "العودة لسوق الأفكار",
       founder: "المؤسس", postedOn: "نُشرت في",
+    },
+    chat: {
+      subtitle: "مرشدك الذكي للشركات الناشئة", clear: "مسح", empty: "ابدأ محادثة مع مرشدك الذكي",
+      placeholder: "اسأل عن أفكار الشركات الناشئة، الاستثمارات، الاستراتيجيات...",
+      thinking: "جاري التفكير...",
+      suggestion1: "كيف أتحقق من صلاحية فكرتي؟",
+      suggestion2: "ما الذي يجعل عرض المشروع جيداً؟",
+      suggestion3: "كيف أجد المستثمرين المناسبين؟",
+      suggestion4: "أخطاء الشركات الناشئة الشائعة",
+    },
+    dashboard: {
+      myIdeas: "أفكاري", savedIdeas: "الأفكار المحفوظة", messages: "الرسائل",
+      noIdeas: "لم تقدم أي أفكار بعد.",
+      noSaved: "لم تحفظ أي أفكار بعد.",
+      noMessages: "لا توجد رسائل بعد.",
+      newIdea: "تقديم فكرة جديدة", browseIdeas: "تصفح الأفكار",
     },
   },
 };
