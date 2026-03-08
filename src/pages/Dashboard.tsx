@@ -285,7 +285,7 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
-          {/* Messages */}
+          {/* Messages - grouped by conversation */}
           <TabsContent value="messages" className="p-6">
             {recentMessages.length === 0 ? (
               <div className="text-center py-12">
@@ -294,18 +294,31 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {recentMessages.map(msg => (
-                  <div key={msg.id} className="flex items-start gap-3 p-4 rounded-xl bg-muted/30">
-                    <MessageSquare className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground line-clamp-2">{msg.content}</p>
-                      <span className="text-xs text-muted-foreground">{new Date(msg.created_at).toLocaleString()}</span>
+                {(() => {
+                  // Group messages by conversation partner
+                  const convMap = new Map<string, MessageRow>();
+                  for (const msg of recentMessages) {
+                    const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+                    if (!convMap.has(partnerId)) convMap.set(partnerId, msg);
+                  }
+                  return Array.from(convMap.entries()).map(([partnerId, msg]) => (
+                    <div key={partnerId}
+                      className="flex items-start gap-3 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/chat-founder/${partnerId}?name=${encodeURIComponent("محادثة")}`)}>
+                      <MessageSquare className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground line-clamp-2">{msg.content}</p>
+                        <span className="text-xs text-muted-foreground">{new Date(msg.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!msg.read && msg.receiver_id === user.id && (
+                          <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                        )}
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    {!msg.read && msg.receiver_id === user.id && (
-                      <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
-                    )}
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             )}
           </TabsContent>
