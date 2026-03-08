@@ -146,7 +146,13 @@ export default function IdeaDetail() {
                   <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">{t.ideaDetail.accessRequested}</Badge>
                 )}
                 {accessStatus === "approved" && (
-                  <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.accessApproved}</Badge>
+                  <>
+                    <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.accessApproved}</Badge>
+                    <Button size="sm" onClick={() => navigate(`/chat-founder/${idea.founder_id}?name=${encodeURIComponent(idea.profiles?.full_name || "—")}&ideaId=${id}`)}
+                      className="gradient-primary border-0 text-primary-foreground">
+                      <MessageCircle className="h-4 w-4 me-1" />{t.ideaDetail.chatWithFounder}
+                    </Button>
+                  </>
                 )}
               </>
             )}
