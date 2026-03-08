@@ -31,8 +31,7 @@ interface IdeaData {
 export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
-  const { user, userRole } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [idea, setIdea] = useState<IdeaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
