@@ -52,6 +52,7 @@ interface SubmitTranslations {
   editAndResubmit: string;
   version: string;
   scoreHistory: string;
+  document: string; documentDesc: string; uploadDoc: string;
 }
 interface MarketplaceTranslations {
   title: string; subtitle: string;
