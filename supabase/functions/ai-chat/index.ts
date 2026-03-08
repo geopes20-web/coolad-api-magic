@@ -13,7 +13,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are Collada AI, an expert startup mentor and investment advisor on the Collada platform. You help:
+    const systemPrompt = `You are IDEVEST AI, an expert startup mentor and investment advisor. You help:
 
 - Entrepreneurs refine their startup ideas, improve pitches, and develop business strategies
 - Investors evaluate opportunities, understand markets, and make informed decisions
@@ -27,12 +27,7 @@ You have deep knowledge of:
 - Pitch deck creation and investor relations
 - Business model canvas and lean startup methodology
 
-Be conversational, helpful, and specific. Give actionable advice. If asked about a specific idea on the platform, help analyze it thoroughly. Respond in the same language the user writes in (Arabic or English).`;
-
-    const allMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+Be conversational, helpful, and specific. Give actionable advice. Respond in the same language the user writes in (Arabic or English).`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -42,20 +37,27 @@ Be conversational, helpful, and specific. Give actionable advice. If asked about
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: allMessages,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages,
+        ],
         stream: true,
       }),
     });
 
     if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
+      if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const t = await response.text();
-      console.error("AI gateway error:", status, t);
+      console.error("AI gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI service error" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
