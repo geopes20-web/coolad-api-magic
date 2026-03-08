@@ -321,6 +321,45 @@ export default function SubmitIdea() {
             <Textarea value={form.additionalInfo || ""} onChange={e => set("additionalInfo", e.target.value)}
               placeholder={t.submit.additionalPh} className="min-h-[80px] bg-background/50 border-border/50" />
           </div>
+
+          {/* Document Upload */}
+          <div className="md:col-span-2 glass rounded-xl p-5 shadow-glass">
+            <Label className="flex items-center gap-2 mb-2 text-sm font-semibold text-foreground">
+              <FileUp className="h-4 w-4 text-primary" />
+              {t.submit.document}
+            </Label>
+            <p className="text-xs text-muted-foreground mb-3">{t.submit.documentDesc}</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.md"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  if (file.size > 20 * 1024 * 1024) {
+                    toast({ title: t.common.error, description: "File too large (max 20MB)", variant: "destructive" });
+                    return;
+                  }
+                  setDocumentFile(file);
+                }
+              }}
+            />
+            {documentFile ? (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <FileUp className="h-5 w-5 text-primary shrink-0" />
+                <span className="text-sm text-foreground truncate flex-1">{documentFile.name}</span>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setDocumentFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => fileInputRef.current?.click()}>
+                <FileUp className="h-4 w-4 me-2" />{t.submit.uploadDoc}
+              </Button>
+            )}
+          </div>
+          </div>
         </div>
 
         <div className="flex justify-center pt-4">
