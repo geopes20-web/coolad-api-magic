@@ -105,6 +105,7 @@ export type Database = {
           created_at: string
           decision: string | null
           description: string
+          document_url: string | null
           evaluation_version: number
           execution_score: number | null
           expected_revenue: string
@@ -136,6 +137,7 @@ export type Database = {
           created_at?: string
           decision?: string | null
           description: string
+          document_url?: string | null
           evaluation_version?: number
           execution_score?: number | null
           expected_revenue?: string
@@ -167,6 +169,7 @@ export type Database = {
           created_at?: string
           decision?: string | null
           description?: string
+          document_url?: string | null
           evaluation_version?: number
           execution_score?: number | null
           expected_revenue?: string
