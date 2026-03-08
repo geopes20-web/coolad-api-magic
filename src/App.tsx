@@ -24,6 +24,7 @@ import PageTransition from "@/components/PageTransition";
 
 const queryClient = new QueryClient();
 
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
