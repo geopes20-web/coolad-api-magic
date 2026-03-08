@@ -93,7 +93,7 @@ export default function Dashboard() {
   }, [user, userRole]);
 
   const handleAccessAction = async (requestId: string, action: "approved" | "rejected") => {
-    await supabase.from("access_requests").update({ status: action } as Record<string, unknown>).eq("id", requestId);
+    await supabase.from("access_requests").update({ status: action } as any).eq("id", requestId);
     setAccessRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: action } : r));
     toast({ title: t.common.success, description: action === "approved" ? t.dashboard.approve : t.dashboard.reject });
   };
