@@ -147,14 +147,12 @@ export default function Dashboard() {
       {dataLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
-        <Tabs defaultValue={userRole === "entrepreneur" ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
+        <Tabs defaultValue={myIdeas.length > 0 ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
           <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
-            {userRole === "entrepreneur" && (
+            {myIdeas.length > 0 && (
               <TabsTrigger value="ideas"><Lightbulb className="h-4 w-4 me-1" />{t.dashboard.myIdeas}</TabsTrigger>
             )}
-            {(userRole === "investor" || userRole === "explorer") && (
-              <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
-            )}
+            <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
             <TabsTrigger value="access"><Lock className="h-4 w-4 me-1" />{t.dashboard.accessRequests}</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 me-1" />{t.dashboard.messages}</TabsTrigger>
           </TabsList>
