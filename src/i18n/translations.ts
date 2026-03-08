@@ -204,6 +204,7 @@ export const translations: Record<Language, TranslationShape> = {
       recommendations: "AI Recommendations",
       executionScore: "Execution", investmentScore: "Investment",
       decision: "AI Decision",
+      yourIdea: "Your Idea",
     },
     chat: {
       subtitle: "Your AI startup mentor", clear: "Clear", empty: "Start a conversation with your AI mentor",
