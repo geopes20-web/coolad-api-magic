@@ -22,7 +22,7 @@ interface IdeaRow {
 }
 
 interface AccessRequestRow {
-  id: string; idea_id: string; investor_id: string; status: string; created_at: string;
+  id: string; idea_id: string; investor_id: string; founder_id: string; status: string; created_at: string;
   investor_profile?: { full_name: string } | null;
   idea_title?: string;
 }
@@ -52,39 +52,34 @@ export default function Dashboard() {
     const load = async () => {
       const promises: Promise<void>[] = [];
 
-      if (userRole === "entrepreneur") {
-        promises.push(
-          supabase.from("ideas").select("id, title, sector, ai_score, risk_score, created_at, status, decision, evaluation_version")
-            .eq("founder_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
-        );
-        // Access requests for entrepreneur's ideas - join investor profile and idea title
-        promises.push(
-          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at, profiles!access_requests_investor_id_fkey(full_name), ideas!access_requests_idea_id_fkey(title)")
-            .eq("founder_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => {
-              const mapped = (data || []).map((r: any) => ({
-                ...r,
-                investor_profile: r.profiles || null,
-                idea_title: r.ideas?.title || "",
-              }));
-              setAccessRequests(mapped as AccessRequestRow[]);
-            }) as unknown as Promise<void>
-        );
-      }
+      // Always load ideas the user founded
+      promises.push(
+        supabase.from("ideas").select("id, title, sector, ai_score, risk_score, created_at, status, decision, evaluation_version")
+          .eq("founder_id", user.id).order("created_at", { ascending: false })
+          .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
+      );
 
-      if (userRole === "investor" || userRole === "explorer") {
-        promises.push(
-          supabase.from("saved_ideas").select("id, idea_id, ideas(id, title, sector, ai_score)")
-            .eq("user_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setSavedIdeas((data as unknown as SavedRow[]) || []); }) as unknown as Promise<void>
-        );
-        promises.push(
-          supabase.from("access_requests").select("id, idea_id, investor_id, status, created_at")
-            .eq("investor_id", user.id).order("created_at", { ascending: false })
-            .then(({ data }) => { setAccessRequests((data as unknown as AccessRequestRow[]) || []); }) as unknown as Promise<void>
-        );
-      }
+      // Always load saved ideas
+      promises.push(
+        supabase.from("saved_ideas").select("id, idea_id, ideas(id, title, sector, ai_score)")
+          .eq("user_id", user.id).order("created_at", { ascending: false })
+          .then(({ data }) => { setSavedIdeas((data as unknown as SavedRow[]) || []); }) as unknown as Promise<void>
+      );
+
+      // Load access requests where user is founder OR investor
+      promises.push(
+        supabase.from("access_requests").select("id, idea_id, investor_id, founder_id, status, created_at, profiles!access_requests_investor_id_fkey(full_name), ideas!access_requests_idea_id_fkey(title)")
+          .or(`founder_id.eq.${user.id},investor_id.eq.${user.id}`)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => {
+            const mapped = (data || []).map((r: any) => ({
+              ...r,
+              investor_profile: r.profiles || null,
+              idea_title: r.ideas?.title || "",
+            }));
+            setAccessRequests(mapped as AccessRequestRow[]);
+          }) as unknown as Promise<void>
+      );
 
       promises.push(
         supabase.from("messages").select("id, content, created_at, read, sender_id, receiver_id")
@@ -152,20 +147,17 @@ export default function Dashboard() {
       {dataLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
-        <Tabs defaultValue={userRole === "entrepreneur" ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
+        <Tabs defaultValue={myIdeas.length > 0 ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
           <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
-            {userRole === "entrepreneur" && (
+            {myIdeas.length > 0 && (
               <TabsTrigger value="ideas"><Lightbulb className="h-4 w-4 me-1" />{t.dashboard.myIdeas}</TabsTrigger>
             )}
-            {(userRole === "investor" || userRole === "explorer") && (
-              <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
-            )}
+            <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
             <TabsTrigger value="access"><Lock className="h-4 w-4 me-1" />{t.dashboard.accessRequests}</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 me-1" />{t.dashboard.messages}</TabsTrigger>
           </TabsList>
 
-          {/* Entrepreneur: My Ideas */}
-          {userRole === "entrepreneur" && (
+          {myIdeas.length > 0 && (
             <TabsContent value="ideas" className="p-6">
               {myIdeas.length === 0 ? (
                 <div className="text-center py-12">
@@ -208,9 +200,8 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
-          {/* Investor: Saved Ideas */}
-          {(userRole === "investor" || userRole === "explorer") && (
-            <TabsContent value="saved" className="p-6">
+          {/* Saved Ideas */}
+          <TabsContent value="saved" className="p-6">
               {savedIdeas.length === 0 ? (
                 <div className="text-center py-12">
                   <Bookmark className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -241,7 +232,6 @@ export default function Dashboard() {
                 </div>
               )}
             </TabsContent>
-          )}
 
           {/* Access Requests */}
           <TabsContent value="access" className="p-6">
@@ -258,7 +248,7 @@ export default function Dashboard() {
                       <Lock className="h-5 w-5 text-primary" />
                       <div>
                         <span className="text-sm font-medium text-foreground">
-                          {userRole === "entrepreneur"
+                          {user.id === req.founder_id
                             ? `${req.investor_profile?.full_name || "مستثمر"} — ${req.idea_title || "فكرة"}`
                             : `${req.idea_title || "Access request"}`}
                         </span>
@@ -266,7 +256,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {req.status === "pending" && userRole === "entrepreneur" ? (
+                      {req.status === "pending" && user.id === req.founder_id ? (
                         <>
                           <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "approved")} className="text-primary border-primary/30">{t.dashboard.approve}</Button>
                           <Button size="sm" variant="outline" onClick={() => handleAccessAction(req.id, "rejected")} className="text-destructive border-destructive/30">{t.dashboard.reject}</Button>
