@@ -359,7 +359,6 @@ export default function SubmitIdea() {
               </Button>
             )}
           </div>
-          </div>
         </div>
 
         <div className="flex justify-center pt-4">
