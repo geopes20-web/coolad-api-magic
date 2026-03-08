@@ -1,6 +1,6 @@
 export type Language = "en" | "ar";
 
-export const translations = {
+export const translations: Record<Language, TranslationShape> = {
   en: {
     // Nav
     nav: {
