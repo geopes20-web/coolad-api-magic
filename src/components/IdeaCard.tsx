@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,12 @@ interface IdeaCardProps {
   riskScore: number;
   marketScore: number;
   capitalRequired: string;
+  index?: number;
 }
 
 export default function IdeaCard({
   id, title, description, sector, location,
-  founderName, aiScore, riskScore, marketScore, capitalRequired,
+  founderName, aiScore, riskScore, marketScore, capitalRequired, index = 0,
 }: IdeaCardProps) {
   const { t } = useLanguage();
 
@@ -27,7 +29,13 @@ export default function IdeaCard({
     score >= 70 ? "text-primary" : score >= 40 ? "text-yellow-500" : "text-destructive";
 
   return (
-    <div className="glass glass-hover rounded-2xl p-6 shadow-glass flex flex-col h-full">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.08, ease: "easeOut" }}
+      whileHover={{ y: -6, scale: 1.02 }}
+      className="glass glass-hover rounded-2xl p-6 shadow-glass flex flex-col h-full"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-foreground text-lg truncate">{title}</h3>
@@ -77,6 +85,6 @@ export default function IdeaCard({
           <ArrowRight className="h-3.5 w-3.5 ms-1" />
         </Button>
       </Link>
-    </div>
+    </motion.div>
   );
 }
