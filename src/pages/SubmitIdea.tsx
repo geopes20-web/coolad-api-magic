@@ -134,6 +134,34 @@ export default function SubmitIdea() {
     setIsLoading(true);
     setShowResult(true);
 
+    // Upload document if present
+    let documentUrl: string | null = null;
+    let documentText = "";
+    if (documentFile) {
+      setUploadingDoc(true);
+      const filePath = `${user.id}/${Date.now()}-${documentFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("idea-documents")
+        .upload(filePath, documentFile);
+      setUploadingDoc(false);
+      if (uploadError) {
+        toast({ title: t.common.error, description: uploadError.message, variant: "destructive" });
+        setIsLoading(false);
+        setShowResult(false);
+        return;
+      }
+      documentUrl = filePath;
+      // Read text from document for AI analysis
+      try {
+        const text = await documentFile.text();
+        if (text && text.length > 0) {
+          documentText = text.substring(0, 10000); // Limit to 10k chars
+        }
+      } catch {
+        // Binary file, can't extract text client-side
+      }
+    }
+
     let fullResult = "";
 
     try {
