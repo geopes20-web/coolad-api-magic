@@ -286,6 +286,22 @@ export const translations: Record<Language, TranslationShape> = {
       notFound: "الفكرة غير موجودة", backToMarketplace: "العودة لسوق الأفكار",
       founder: "المؤسس", postedOn: "نُشرت في",
     },
+    chat: {
+      subtitle: "مرشدك الذكي للشركات الناشئة", clear: "مسح", empty: "ابدأ محادثة مع مرشدك الذكي",
+      placeholder: "اسأل عن أفكار الشركات الناشئة، الاستثمارات، الاستراتيجيات...",
+      thinking: "جاري التفكير...",
+      suggestion1: "كيف أتحقق من صلاحية فكرتي؟",
+      suggestion2: "ما الذي يجعل عرض المشروع جيداً؟",
+      suggestion3: "كيف أجد المستثمرين المناسبين؟",
+      suggestion4: "أخطاء الشركات الناشئة الشائعة",
+    },
+    dashboard: {
+      myIdeas: "أفكاري", savedIdeas: "الأفكار المحفوظة", messages: "الرسائل",
+      noIdeas: "لم تقدم أي أفكار بعد.",
+      noSaved: "لم تحفظ أي أفكار بعد.",
+      noMessages: "لا توجد رسائل بعد.",
+      newIdea: "تقديم فكرة جديدة", browseIdeas: "تصفح الأفكار",
+    },
   },
 };
 
