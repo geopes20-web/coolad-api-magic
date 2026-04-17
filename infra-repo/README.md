@@ -1,0 +1,73 @@
+# 🏗️ Infrastructure Repository - EKS Cluster with Terraform
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AWS Cloud (Free Tier)                  │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │                     VPC (10.0.0.0/16)                │ │
+│  │  ┌──────────────┐  ┌──────────────┐                  │ │
+│  │  │ Public Sub 1 │  │ Public Sub 2 │  (2 AZs)        │ │
+│  │  │ 10.0.1.0/24  │  │ 10.0.2.0/24  │                  │ │
+│  │  └──────┬───────┘  └──────┬───────┘                  │ │
+│  │         │                  │                          │ │
+│  │  ┌──────┴──────────────────┴───────┐                  │ │
+│  │  │          EKS Cluster             │                  │ │
+│  │  │  ┌─────────────────────────┐    │                  │ │
+│  │  │  │  Node Group (t3.small)  │    │                  │ │
+│  │  │  │  Min: 1 | Max: 2        │    │                  │ │
+│  │  │  │  Desired: 2             │    │                  │ │
+│  │  │  └─────────────────────────┘    │                  │ │
+│  │  └─────────────────────────────────┘                  │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                           │
+│  ┌─────────────┐  ┌─────────────┐                        │
+│  │  S3 Backend  │  │  DynamoDB   │  (Terraform State)    │
+│  └─────────────┘  └─────────────┘                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Module Structure
+
+```
+infra-repo/
+├── .github/workflows/
+│   └── terraform.yml          # CI Pipeline
+├── modules/
+│   ├── vpc/                   # VPC + Subnets + IGW + NAT
+│   ├── iam/                   # EKS Roles + Policies
+│   ├── security-groups/       # Cluster + Node SGs
+│   └── eks/                   # EKS Cluster + Node Group
+├── backend.tf                 # S3 Remote State
+├── providers.tf               # AWS Provider Config
+├── main.tf                    # Root Module
+├── variables.tf               # Input Variables
+├── outputs.tf                 # Output Values
+└── terraform.tfvars           # Variable Values
+```
+
+## Prerequisites
+
+1. AWS Account with Free Tier
+2. S3 Bucket for Terraform state
+3. DynamoDB table for state locking
+4. GitHub Secrets configured:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION`
+
+## Usage
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+## Free Tier Notes
+
+- EKS control plane: $0.10/hr (not free tier, ~$73/mo)
+- Node Group: t3.small (2 vCPU, 2GB) - cheapest viable option
+- 2 nodes minimum for HA across 2 AZs
+- Consider using `t3.micro` for testing only

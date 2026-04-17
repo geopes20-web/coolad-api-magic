@@ -1,0 +1,89 @@
+name: Terraform Pipeline v6
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose Terraform Action"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infra-repo
+    env:
+      TF_LOG: INFO
+      TF_WORKSPACE: default
+      AWS_REGION: us-east-1
+
+    steps:
+      # 1️⃣ Checkout
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ AWS Credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # 3️⃣ Clean cache
+      - name: Clean Terraform cache
+        run: |
+          rm -rf .terraform
+          rm -f tfplan tf_*.log
+
+      # 4️⃣ Terraform Setup
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.6.6"
+
+      # 5️⃣ Init
+      - name: Terraform Init
+        run: terraform init -input=false -reconfigure -upgrade
+
+      # =====================================
+      # 🟡 PLAN
+      # =====================================
+      - name: Terraform Plan
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        run: terraform plan -out=tfplan | tee tf_plan.log
+
+      # =====================================
+      # 🟢 APPLY
+      # =====================================
+      - name: Terraform Apply
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: terraform apply -auto-approve tfplan | tee tf_apply.log
+
+      # =====================================
+      # 🔴 DESTROY
+      # =====================================
+      - name: Terraform Destroy
+        if: ${{ github.event.inputs.action == 'destroy' }}
+        run: terraform destroy -auto-approve | tee tf_destroy.log
+
+      # =====================================
+      # 📤 Upload logs — ✅ FIX: correct path
+      # =====================================
+      - name: Upload logs
+        if: always()   # ✅ FIX: upload even on failure so you can debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-logs
+          path: |
+            infra-repo/tf_plan.log
+            infra-repo/tf_apply.log
+            infra-repo/tf_destroy.log
+          if-no-files-found: warn   # ✅ FIX: don't fail if some logs don't exist

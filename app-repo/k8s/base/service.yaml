@@ -1,0 +1,40 @@
+# ============================================
+# Backend Service (ClusterIP - internal only)
+# Frontend talks to backend via this service
+# ============================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ideavest-backend-svc
+  namespace: ideavest-app
+  labels:
+    app: ideavest-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: ideavest-backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+# ============================================
+# Frontend Service (ClusterIP - behind Ingress)
+# ============================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ideavest-frontend-svc
+  namespace: ideavest-app
+  labels:
+    app: ideavest-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: ideavest-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
