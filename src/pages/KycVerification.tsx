@@ -82,7 +82,7 @@ export default function KycVerification() {
 
   const StatusBadge = () => {
     if (status === "approved") return <Badge className="bg-primary/10 text-primary border-primary/20"><CheckCircle2 className="h-3 w-3 me-1" />{isAr ? "موافق عليه" : "Approved"}</Badge>;
-    if (status === "pending") return <Badge variant="outline" className="text-yellow-500 border-yellow-500/30"><Clock className="h-3 w-3 me-1" />{isAr ? "قيد المراجعة" : "Under Review"}</Badge>;
+    if (status === "pending") return <Badge variant="outline" className="text-muted-foreground"><Clock className="h-3 w-3 me-1" />{isAr ? "قيد المراجعة" : "Under Review"}</Badge>;
     if (status === "rejected") return <Badge variant="destructive"><XCircle className="h-3 w-3 me-1" />{isAr ? "مرفوض" : "Rejected"}</Badge>;
     return <Badge variant="outline"><ShieldQuestion className="h-3 w-3 me-1" />{isAr ? "لم يبدأ" : "Not Started"}</Badge>;
   };
