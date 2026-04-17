@@ -62,7 +62,7 @@ interface MarketplaceTranslations {
   noResults: string;
   aiScore: string; riskScore: string; marketScore: string;
   viewDetails: string; by: string;
-  sortBy: string; newest: string; highestScore: string; lowestRisk: string;
+  sortBy: string; newest: string; highestScore: string; lowestRisk: string; lowestCapital: string;
   accepted: string;
 }
 interface IdeaDetailTranslations {
@@ -183,7 +183,7 @@ export const translations: Record<Language, TranslationShape> = {
       noResults: "No ideas found matching your criteria.",
       aiScore: "AI Score", riskScore: "Risk", marketScore: "Market",
       viewDetails: "View Details", by: "by",
-      sortBy: "Sort by", newest: "Newest", highestScore: "Highest Score", lowestRisk: "Lowest Risk",
+      sortBy: "Sort by", newest: "Newest", highestScore: "Highest Score", lowestRisk: "Lowest Risk", lowestCapital: "Lowest Capital",
       accepted: "AI Accepted",
     },
     ideaDetail: {
@@ -309,7 +309,7 @@ export const translations: Record<Language, TranslationShape> = {
       noResults: "لا توجد أفكار تطابق معايير البحث.",
       aiScore: "تقييم AI", riskScore: "المخاطر", marketScore: "السوق",
       viewDetails: "عرض التفاصيل", by: "بواسطة",
-      sortBy: "ترتيب حسب", newest: "الأحدث", highestScore: "أعلى تقييم", lowestRisk: "أقل مخاطر",
+      sortBy: "ترتيب حسب", newest: "الأحدث", highestScore: "أعلى تقييم", lowestRisk: "أقل مخاطر", lowestCapital: "أقل رأس مال",
       accepted: "مقبول من AI",
     },
     ideaDetail: {

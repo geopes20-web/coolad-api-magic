@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Globe, Menu, X, User, LogOut, LayoutDashboard, Zap, Moon, Sun } from "lucide-react";
+import { Globe, Menu, X, User, LogOut, LayoutDashboard, Zap, Moon, Sun, ShieldCheck, Handshake } from "lucide-react";
 
 export default function Navbar() {
   const { t, language, setLanguage } = useLanguage();
@@ -67,6 +67,12 @@ export default function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                   <LayoutDashboard className="h-4 w-4 me-2" />{t.nav.dashboard}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/kyc")}>
+                  <ShieldCheck className="h-4 w-4 me-2" />KYC
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/deals")}>
+                  <Handshake className="h-4 w-4 me-2" />{language === "ar" ? "صفقاتي" : "My Deals"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut className="h-4 w-4 me-2" />{t.nav.logout}
