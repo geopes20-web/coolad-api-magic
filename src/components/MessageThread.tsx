@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { Send, Loader2, ArrowLeft, User, ShieldAlert } from "lucide-react";
-import { containsExternalContact, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
+import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 
 interface Message {
   id: string;
@@ -75,8 +75,9 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
 
-    // Check for external contact info
-    if (containsExternalContact(input)) {
+    // Layer 1: Client-side filter (instant feedback)
+    const analysis = analyzeMessage(input);
+    if (analysis.blocked) {
       toast({
         title: "⚠️",
         description: document.documentElement.lang === "ar" ? BLOCKED_MESSAGE_AR : BLOCKED_MESSAGE_EN,
@@ -86,15 +87,21 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     }
 
     setSending(true);
-    const { error } = await supabase.from("messages").insert({
-      sender_id: user.id,
-      receiver_id: otherUserId,
-      idea_id: ideaId || null,
-      content: input.trim(),
+    // Layer 2: Server-side filter via edge function (authoritative)
+    const { data, error } = await supabase.functions.invoke("send-message", {
+      body: { receiver_id: otherUserId, content: input.trim(), idea_id: ideaId || null },
     });
     setSending(false);
-    if (error) {
-      toast({ title: t.common.error, description: error.message, variant: "destructive" });
+
+    if (error || (data as any)?.error === "blocked") {
+      const isBlocked = (data as any)?.error === "blocked";
+      toast({
+        title: isBlocked ? "⚠️" : t.common.error,
+        description: isBlocked
+          ? (document.documentElement.lang === "ar" ? BLOCKED_MESSAGE_AR : BLOCKED_MESSAGE_EN)
+          : (error?.message || "Failed to send"),
+        variant: "destructive",
+      });
     } else {
       setInput("");
     }
