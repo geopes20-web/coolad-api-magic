@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.payment-webhook]
 verify_jwt = false
+
+[functions.verify-id-card]
+verify_jwt = true

@@ -1,6 +1,8 @@
 import { useParams, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MessageThread from "@/components/MessageThread";
+import AccessGate from "@/components/AccessGate";
+import NdaGate from "@/components/NdaGate";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -17,15 +19,19 @@ export default function ChatWithFounder() {
   if (!founderId) return <Navigate to="/marketplace" replace />;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-3xl">
-      <div className="glass rounded-2xl shadow-glass overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
-        <MessageThread
-          otherUserId={founderId}
-          otherUserName={founderName}
-          ideaId={ideaId}
-          onBack={() => navigate(-1)}
-        />
+    <AccessGate feature="chat">
+      <div className="container mx-auto px-4 py-6 max-w-3xl">
+        <div className="glass rounded-2xl shadow-glass overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
+          <NdaGate ideaId={ideaId} otherUserId={founderId}>
+            <MessageThread
+              otherUserId={founderId}
+              otherUserName={founderName}
+              ideaId={ideaId}
+              onBack={() => navigate(-1)}
+            />
+          </NdaGate>
+        </div>
       </div>
-    </div>
+    </AccessGate>
   );
 }
