@@ -377,10 +377,14 @@ export type Database = {
       kyc_verifications: {
         Row: {
           address: string | null
+          ai_verification_result: Json | null
+          ai_verified_at: string | null
           created_at: string
           date_of_birth: string | null
           full_legal_name: string | null
           id: string
+          id_card_back_url: string | null
+          id_card_front_url: string | null
           id_document_url: string | null
           national_id: string | null
           nationality: string | null
@@ -396,10 +400,14 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_verification_result?: Json | null
+          ai_verified_at?: string | null
           created_at?: string
           date_of_birth?: string | null
           full_legal_name?: string | null
           id?: string
+          id_card_back_url?: string | null
+          id_card_front_url?: string | null
           id_document_url?: string | null
           national_id?: string | null
           nationality?: string | null
@@ -415,10 +423,14 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_verification_result?: Json | null
+          ai_verified_at?: string | null
           created_at?: string
           date_of_birth?: string | null
           full_legal_name?: string | null
           id?: string
+          id_card_back_url?: string | null
+          id_card_front_url?: string | null
           id_document_url?: string | null
           national_id?: string | null
           nationality?: string | null
@@ -563,6 +575,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          phone_number: string | null
           updated_at: string
         }
         Insert: {
@@ -571,6 +584,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id: string
+          phone_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -579,6 +593,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          phone_number?: string | null
           updated_at?: string
         }
         Relationships: []
