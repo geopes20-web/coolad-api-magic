@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Sparkles, Loader2 } from "lucide-react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function Login() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isAr = language === "ar";
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +43,12 @@ export default function Login() {
         </div>
 
         <div className="glass rounded-2xl p-8 shadow-glass">
+          <GoogleSignInButton label={isAr ? "تسجيل الدخول عبر Google" : "Sign in with Google"} />
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-xs text-muted-foreground">{isAr ? "أو" : "OR"}</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">{t.auth.email}</Label>

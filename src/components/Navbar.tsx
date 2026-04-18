@@ -10,11 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Globe, Menu, X, User, LogOut, LayoutDashboard, Zap, Moon, Sun, ShieldCheck, Handshake } from "lucide-react";
+import { Globe, Menu, X, User, LogOut, LayoutDashboard, Zap, Moon, Sun, ShieldCheck, Handshake, Shield } from "lucide-react";
 
 export default function Navbar() {
   const { t, language, setLanguage } = useLanguage();
-  const { user, signOut } = useAuth();
+  const { user, signOut, userRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -74,6 +74,11 @@ export default function Navbar() {
                 <DropdownMenuItem onClick={() => navigate("/deals")}>
                   <Handshake className="h-4 w-4 me-2" />{language === "ar" ? "صفقاتي" : "My Deals"}
                 </DropdownMenuItem>
+                {userRole === "admin" && (
+                  <DropdownMenuItem onClick={() => navigate("/admin")}>
+                    <Shield className="h-4 w-4 me-2" />{language === "ar" ? "لوحة الأدمن" : "Admin Panel"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut className="h-4 w-4 me-2" />{t.nav.logout}
                 </DropdownMenuItem>

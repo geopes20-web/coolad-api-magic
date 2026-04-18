@@ -6,16 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Sparkles, Loader2, Rocket, DollarSign, Compass } from "lucide-react";
+import { Sparkles, Loader2, Rocket, DollarSign, Compass, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 type Role = "entrepreneur" | "investor" | "explorer";
 
 export default function Register() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isAr = language === "ar";
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("explorer");
   const [loading, setLoading] = useState(false);
@@ -26,10 +29,16 @@ export default function Register() {
     { value: "explorer" as Role, label: t.auth.explorer, desc: t.auth.explorerDesc, icon: Compass },
   ];
 
+  const validatePhone = (p: string) => /^[\d+\s()-]{8,20}$/.test(p.trim());
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-      toast({ title: t.common.error, description: "Password must be at least 6 characters", variant: "destructive" });
+      toast({ title: t.common.error, description: isAr ? "كلمة المرور 6 أحرف على الأقل" : "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    if (!validatePhone(phone)) {
+      toast({ title: t.common.error, description: isAr ? "رقم هاتف غير صالح" : "Invalid phone number", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -38,7 +47,7 @@ export default function Register() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone_number: phone.trim() },
         emailRedirectTo: window.location.origin,
       },
     });
@@ -49,13 +58,12 @@ export default function Register() {
       return;
     }
 
-    // Insert role
     if (data.user) {
       await supabase.from("user_roles").insert({ user_id: data.user.id, role });
     }
 
     setLoading(false);
-    toast({ title: t.common.success, description: "Account created successfully!" });
+    toast({ title: t.common.success, description: isAr ? "تم إنشاء الحساب بنجاح!" : "Account created successfully!" });
     navigate("/dashboard");
   };
 
@@ -72,7 +80,14 @@ export default function Register() {
         </div>
 
         <div className="glass rounded-2xl p-8 shadow-glass">
-          <form onSubmit={handleRegister} className="space-y-5">
+          <GoogleSignInButton label={isAr ? "التسجيل عبر Google" : "Sign up with Google"} />
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-xs text-muted-foreground">{isAr ? "أو" : "OR"}</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
+          <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">{t.auth.fullName}</Label>
               <Input id="fullName" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
@@ -82,11 +97,17 @@ export default function Register() {
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-1">
+                <Phone className="h-3.5 w-3.5" />
+                {isAr ? "رقم الهاتف *" : "Phone Number *"}
+              </Label>
+              <Input id="phone" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+201234567890" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="password">{t.auth.password}</Label>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            {/* Role Selection */}
             <div className="space-y-2">
               <Label>{t.auth.role}</Label>
               <div className="grid gap-2">
