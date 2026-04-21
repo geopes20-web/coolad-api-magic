@@ -35,7 +35,7 @@ export default function Admin() {
   const isAr = language === "ar";
 
   const [kycList, setKycList] = useState<KycRow[]>([]);
-  const [users, setUsers] = useState<ProfileRow[]>([]);
+  const [users, setUsers] = useState<ProfileFull[]>([]);
   const [ideas, setIdeas] = useState<IdeaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKyc, setSelectedKyc] = useState<KycRow | null>(null);
