@@ -1,7 +1,7 @@
 // Edge function: verify-id-card
-// Uses Lovable AI (Gemini Vision) to OCR and verify Egyptian ID card images.
-// Input: { frontUrl: string, backUrl: string } -- signed URLs accessible by service role
-// Output: { ok: boolean, extracted: {...}, confidence: number, issues: string[] }
+// Egyptian National ID verification via Mindee + cross-check with user-entered ID.
+// Falls back to Lovable AI Gemini Vision for tampering / face presence detection.
+// Auto-approves KYC when extracted ID equals user-entered ID and no tampering detected.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -16,6 +16,8 @@ Deno.serve(async (req) => {
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const MINDEE_API_KEY = Deno.env.get("MINDEE_API_KEY");
+    const MINDEE_MODEL_ID = Deno.env.get("MINDEE_MODEL_ID");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
