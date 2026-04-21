@@ -63,8 +63,13 @@ export default function Register() {
     }
 
     setLoading(false);
-    toast({ title: t.common.success, description: isAr ? "تم إنشاء الحساب بنجاح!" : "Account created successfully!" });
-    navigate("/dashboard");
+    toast({
+      title: t.common.success,
+      description: isAr
+        ? "تم إنشاء الحساب! الخطوة التالية: تأكيد رقم الهاتف"
+        : "Account created! Next: verify your phone",
+    });
+    navigate("/verify-phone");
   };
 
   return (

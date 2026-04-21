@@ -23,6 +23,7 @@ import ChatWithFounder from "@/pages/ChatWithFounder";
 import KycVerification from "@/pages/KycVerification";
 import MyDeals from "@/pages/MyDeals";
 import Admin from "@/pages/Admin";
+import VerifyPhone from "@/pages/VerifyPhone";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 
@@ -46,6 +47,7 @@ function AnimatedRoutes() {
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
         <Route path="/kyc" element={<PageTransition><KycVerification /></PageTransition>} />
+        <Route path="/verify-phone" element={<PageTransition><VerifyPhone /></PageTransition>} />
         <Route path="/deals" element={<PageTransition><MyDeals /></PageTransition>} />
         <Route path="/admin" element={<PageTransition><Admin /></PageTransition>} />
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />

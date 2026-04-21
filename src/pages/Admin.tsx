@@ -26,6 +26,7 @@ type KycRow = {
   ai_verification_result: any; created_at: string;
 };
 type ProfileRow = { id: string; full_name: string; phone_number: string | null; created_at: string };
+type ProfileFull = ProfileRow & { is_blocked?: boolean; blocked_reason?: string | null };
 type IdeaRow = { id: string; title: string; sector: string; status: string; ai_score: number | null; founder_id: string; created_at: string };
 
 export default function Admin() {
@@ -34,11 +35,12 @@ export default function Admin() {
   const isAr = language === "ar";
 
   const [kycList, setKycList] = useState<KycRow[]>([]);
-  const [users, setUsers] = useState<ProfileRow[]>([]);
+  const [users, setUsers] = useState<ProfileFull[]>([]);
   const [ideas, setIdeas] = useState<IdeaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKyc, setSelectedKyc] = useState<KycRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [newAdminEmail, setNewAdminEmail] = useState("");
 
   const isAdmin = userRole === "admin";
 
@@ -46,11 +48,11 @@ export default function Admin() {
     setLoading(true);
     const [k, p, i] = await Promise.all([
       supabase.from("kyc_verifications").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id,full_name,phone_number,created_at,is_blocked,blocked_reason").order("created_at", { ascending: false }),
       supabase.from("ideas").select("id,title,sector,status,ai_score,founder_id,created_at").order("created_at", { ascending: false }),
     ]);
     setKycList((k.data as KycRow[]) || []);
-    setUsers((p.data as ProfileRow[]) || []);
+    setUsers((p.data as ProfileFull[]) || []);
     setIdeas((i.data as IdeaRow[]) || []);
     setLoading(false);
   };
@@ -85,6 +87,26 @@ export default function Admin() {
     const { error } = await supabase.from("ideas").update({ status: next, decision: next }).eq("id", id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: isAr ? "تم التحديث" : "Updated" }); loadAll(); }
+  };
+
+  const blockUser = async (uid: string) => {
+    const reason = prompt(isAr ? "سبب الحظر:" : "Reason:") || "Violation";
+    const { error } = await supabase.rpc("admin_block_user", { _target_user: uid, _reason: reason });
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: isAr ? "تم الحظر" : "Blocked" }); loadAll(); }
+  };
+  const unblockUser = async (uid: string) => {
+    const { error } = await supabase.rpc("admin_unblock_user", { _target_user: uid });
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: isAr ? "أُلغي الحظر" : "Unblocked" }); loadAll(); }
+  };
+  const grantAdmin = async () => {
+    if (!newAdminEmail.trim()) return;
+    const { data: prof } = await supabase.from("profiles").select("id, full_name").ilike("full_name", `%${newAdminEmail.trim()}%`).maybeSingle();
+    if (!prof) { toast({ title: isAr ? "المستخدم غير موجود" : "User not found, search by full_name", variant: "destructive" }); return; }
+    const { error } = await supabase.rpc("admin_grant_role", { _target_user: prof.id, _role: "admin" as const });
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: isAr ? "تم منح صلاحية الأدمن" : "Admin granted to " + (prof.full_name || prof.id) }); setNewAdminEmail(""); loadAll(); }
   };
 
   const getSignedUrl = async (path: string | null) => {
@@ -216,12 +238,28 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-2">
+            <div className="glass rounded-xl p-4 flex gap-2 items-end mb-3">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground">{isAr ? "ابحث بالاسم لمنح صلاحية أدمن" : "Search by full name to grant admin"}</label>
+                <input value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm" placeholder="Full name" />
+              </div>
+              <Button onClick={grantAdmin} className="gradient-primary border-0 text-primary-foreground">
+                <Shield className="h-4 w-4 me-1" />{isAr ? "منح أدمن" : "Grant Admin"}
+              </Button>
+            </div>
             {users.map(u => (
-              <div key={u.id} className="glass rounded-xl p-4 flex items-center justify-between">
+              <div key={u.id} className="glass rounded-xl p-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-foreground">{u.full_name || "—"}</p>
+                  <p className="font-medium text-foreground flex items-center gap-2">
+                    {u.full_name || "—"}
+                    {u.is_blocked && <Badge variant="destructive">{isAr ? "محظور" : "Blocked"}</Badge>}
+                  </p>
                   <p className="text-xs text-muted-foreground">{u.phone_number || (isAr ? "بدون هاتف" : "No phone")} · {new Date(u.created_at).toLocaleDateString()}</p>
                 </div>
+                {u.is_blocked
+                  ? <Button size="sm" variant="outline" onClick={() => unblockUser(u.id)}>{isAr ? "إلغاء حظر" : "Unblock"}</Button>
+                  : <Button size="sm" variant="outline" className="text-destructive" onClick={() => blockUser(u.id)}>{isAr ? "حظر" : "Block"}</Button>}
               </div>
             ))}
           </TabsContent>

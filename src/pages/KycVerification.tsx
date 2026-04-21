@@ -132,24 +132,27 @@ export default function KycVerification() {
       return;
     }
 
-    // Trigger AI verification (best-effort, async)
+    // Trigger Mindee + AI verification synchronously and decide auto-approve
     setAiChecking(true);
-    supabase.functions.invoke("verify-id-card", { body: { frontPath, backPath } })
-      .then(({ data, error }) => {
-        if (error) console.warn("AI verify failed:", error);
-        else if (data?.result) {
-          const r = data.result;
-          if (r.tampering_detected) {
-            toast({ title: "⚠️", description: isAr ? "تم اكتشاف علامات تزوير محتملة. سيتم المراجعة." : "Possible tampering detected — will be reviewed.", variant: "destructive" });
-          } else {
-            toast({ title: isAr ? "تم التحليل" : "AI Analyzed", description: `${isAr ? "الثقة:" : "Confidence:"} ${r.confidence}%` });
-          }
-        }
-      })
-      .finally(() => setAiChecking(false));
-
     setSaving(false);
-    toast({ title: isAr ? "تم!" : "Success!", description: isAr ? "تم تقديم بياناتك للمراجعة" : "Submitted for review" });
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-id-card", {
+        body: { frontPath, backPath, userEnteredNationalId: form.national_id },
+      });
+      if (error) throw error;
+      if (data?.autoApproved) {
+        toast({ title: "✅", description: isAr ? "تمت المصادقة وقبول هويتك تلقائياً" : "Verified and auto-approved" });
+      } else if (data?.reason) {
+        toast({ title: isAr ? "❌ مرفوض" : "Rejected", description: data.reason, variant: "destructive" });
+      } else {
+        toast({ title: "⏳", description: isAr ? "تم الإرسال للمراجعة اليدوية" : "Sent for manual review" });
+      }
+    } catch (e) {
+      toast({ title: isAr ? "خطأ في التحقق" : "Verification error", description: e instanceof Error ? e.message : "", variant: "destructive" });
+    } finally {
+      setAiChecking(false);
+    }
+
     const { data: refreshed } = await supabase.from("kyc_verifications").select("*").eq("user_id", user.id).maybeSingle();
     setKyc(refreshed as KycRow);
     setFrontFile(null); setBackFile(null);

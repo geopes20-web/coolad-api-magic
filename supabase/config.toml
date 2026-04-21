@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.verify-id-card]
 verify_jwt = true
+
+[functions.verify-phone-otp]
+verify_jwt = true
+
+[functions.firebase-config]
+verify_jwt = false
