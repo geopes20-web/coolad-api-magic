@@ -200,7 +200,10 @@ export type Database = {
           contract_terms: string
           contract_url: string | null
           created_at: string
+          deal_type: string
           equity_percentage: number | null
+          escrow_hold_id: string | null
+          escrow_status: string | null
           founder_id: string
           founder_signed_at: string | null
           id: string
@@ -221,7 +224,10 @@ export type Database = {
           contract_terms: string
           contract_url?: string | null
           created_at?: string
+          deal_type?: string
           equity_percentage?: number | null
+          escrow_hold_id?: string | null
+          escrow_status?: string | null
           founder_id: string
           founder_signed_at?: string | null
           id?: string
@@ -242,7 +248,10 @@ export type Database = {
           contract_terms?: string
           contract_url?: string | null
           created_at?: string
+          deal_type?: string
           equity_percentage?: number | null
+          escrow_hold_id?: string | null
+          escrow_status?: string | null
           founder_id?: string
           founder_signed_at?: string | null
           id?: string
@@ -258,6 +267,27 @@ export type Database = {
           status?: Database["public"]["Enums"]["deal_status"]
           updated_at?: string
           valuation_usd?: number | null
+        }
+        Relationships: []
+      }
+      idea_views: {
+        Row: {
+          id: string
+          idea_id: string
+          viewed_at: string
+          viewer_id: string | null
+        }
+        Insert: {
+          id?: string
+          idea_id: string
+          viewed_at?: string
+          viewer_id?: string | null
+        }
+        Update: {
+          id?: string
+          idea_id?: string
+          viewed_at?: string
+          viewer_id?: string | null
         }
         Relationships: []
       }
@@ -277,14 +307,18 @@ export type Database = {
           document_url: string | null
           evaluation_version: number
           execution_score: number | null
+          expected_5yr_revenue_usd: number | null
           expected_revenue: string
           expected_revenue_usd: number | null
           founder_id: string
           id: string
           innovation_score: number | null
           investment_score: number | null
+          listing_type: Database["public"]["Enums"]["idea_listing_type"]
           location: string
           market_score: number | null
+          milestones: Json | null
+          problem_solved: string | null
           risk_score: number | null
           score_history: Json | null
           sector: string
@@ -295,6 +329,7 @@ export type Database = {
           timeline: string
           title: string
           updated_at: string
+          view_count: number
         }
         Insert: {
           additional_info?: string | null
@@ -311,14 +346,18 @@ export type Database = {
           document_url?: string | null
           evaluation_version?: number
           execution_score?: number | null
+          expected_5yr_revenue_usd?: number | null
           expected_revenue?: string
           expected_revenue_usd?: number | null
           founder_id: string
           id?: string
           innovation_score?: number | null
           investment_score?: number | null
+          listing_type?: Database["public"]["Enums"]["idea_listing_type"]
           location?: string
           market_score?: number | null
+          milestones?: Json | null
+          problem_solved?: string | null
           risk_score?: number | null
           score_history?: Json | null
           sector: string
@@ -329,6 +368,7 @@ export type Database = {
           timeline?: string
           title: string
           updated_at?: string
+          view_count?: number
         }
         Update: {
           additional_info?: string | null
@@ -345,14 +385,18 @@ export type Database = {
           document_url?: string | null
           evaluation_version?: number
           execution_score?: number | null
+          expected_5yr_revenue_usd?: number | null
           expected_revenue?: string
           expected_revenue_usd?: number | null
           founder_id?: string
           id?: string
           innovation_score?: number | null
           investment_score?: number | null
+          listing_type?: Database["public"]["Enums"]["idea_listing_type"]
           location?: string
           market_score?: number | null
+          milestones?: Json | null
+          problem_solved?: string | null
           risk_score?: number | null
           score_history?: Json | null
           sector?: string
@@ -363,6 +407,7 @@ export type Database = {
           timeline?: string
           title?: string
           updated_at?: string
+          view_count?: number
         }
         Relationships: [
           {
@@ -381,11 +426,14 @@ export type Database = {
           ai_verified_at: string | null
           created_at: string
           date_of_birth: string | null
+          face_match_score: number | null
           full_legal_name: string | null
           id: string
           id_card_back_url: string | null
           id_card_front_url: string | null
           id_document_url: string | null
+          mindee_extracted_data: Json | null
+          mindee_verified_at: string | null
           national_id: string | null
           nationality: string | null
           phone_number: string | null
@@ -404,11 +452,14 @@ export type Database = {
           ai_verified_at?: string | null
           created_at?: string
           date_of_birth?: string | null
+          face_match_score?: number | null
           full_legal_name?: string | null
           id?: string
           id_card_back_url?: string | null
           id_card_front_url?: string | null
           id_document_url?: string | null
+          mindee_extracted_data?: Json | null
+          mindee_verified_at?: string | null
           national_id?: string | null
           nationality?: string | null
           phone_number?: string | null
@@ -427,11 +478,14 @@ export type Database = {
           ai_verified_at?: string | null
           created_at?: string
           date_of_birth?: string | null
+          face_match_score?: number | null
           full_legal_name?: string | null
           id?: string
           id_card_back_url?: string | null
           id_card_front_url?: string | null
           id_document_url?: string | null
+          mindee_extracted_data?: Json | null
+          mindee_verified_at?: string | null
           national_id?: string | null
           nationality?: string | null
           phone_number?: string | null
@@ -572,29 +626,80 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          blocked_at: string | null
+          blocked_reason: string | null
           created_at: string
           full_name: string
           id: string
+          is_blocked: boolean
           phone_number: string | null
+          phone_verified_at: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          blocked_at?: string | null
+          blocked_reason?: string | null
           created_at?: string
           full_name?: string
           id: string
+          is_blocked?: boolean
           phone_number?: string | null
+          phone_verified_at?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          blocked_at?: string | null
+          blocked_reason?: string | null
           created_at?: string
           full_name?: string
           id?: string
+          is_blocked?: boolean
           phone_number?: string | null
+          phone_verified_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          reporter_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          reporter_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_id?: string
+          target_type?: string
         }
         Relationships: []
       }
@@ -650,6 +755,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_block_user: {
+        Args: { _reason: string; _target_user: string }
+        Returns: undefined
+      }
+      admin_grant_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user: string
+        }
+        Returns: undefined
+      }
+      admin_unblock_user: { Args: { _target_user: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -657,6 +774,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_idea_views: { Args: { _idea_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "entrepreneur" | "investor" | "explorer" | "admin"
@@ -668,6 +786,7 @@ export type Database = {
         | "signed"
         | "completed"
         | "cancelled"
+      idea_listing_type: "sell_only" | "sell_and_execute" | "partnership"
       kyc_status: "not_started" | "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
@@ -806,6 +925,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      idea_listing_type: ["sell_only", "sell_and_execute", "partnership"],
       kyc_status: ["not_started", "pending", "approved", "rejected"],
     },
   },
