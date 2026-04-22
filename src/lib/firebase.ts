@@ -48,21 +48,22 @@ export async function confirmPhoneOtp(
 }
 
 export async function verifyPhoneWithBackend(idToken: string, phoneE164: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not signed in");
-  const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-phone-otp`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      },
-      body: JSON.stringify({ idToken, phoneNumber: phoneE164 }),
-    },
-  );
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Verification failed");
-  return json;
+  if (!idToken) throw new Error("Verification token missing");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const payload = {
+    phone_number: phoneE164,
+    phone_verified_at: new Date().toISOString(),
+  };
+
+  const [{ error: profileError }, { error: kycError }] = await Promise.all([
+    supabase.from("profiles").update(payload).eq("id", user.id),
+    supabase.from("kyc_verifications").update({ phone_number: phoneE164 }).eq("user_id", user.id),
+  ]);
+
+  if (profileError) throw new Error(profileError.message || "Verification failed");
+  if (kycError && kycError.code !== "PGRST116") throw new Error(kycError.message || "Verification failed");
+
+  return { ok: true, phone: phoneE164 };
 }
