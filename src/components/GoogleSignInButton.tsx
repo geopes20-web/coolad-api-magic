@@ -3,6 +3,7 @@ import { lovable } from "@/integrations/lovable";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface GoogleSignInButtonProps {
   label: string;
@@ -10,11 +11,13 @@ interface GoogleSignInButtonProps {
 
 export default function GoogleSignInButton({ label }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleClick = async () => {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/dashboard",
+      redirect_uri: window.location.origin,
+      extraParams: { prompt: "select_account" },
     });
     if (result.error) {
       setLoading(false);
@@ -26,6 +29,7 @@ export default function GoogleSignInButton({ label }: GoogleSignInButtonProps) {
       return;
     }
     if (result.redirected) return; // browser will redirect
+    navigate("/dashboard");
     setLoading(false);
   };
 
