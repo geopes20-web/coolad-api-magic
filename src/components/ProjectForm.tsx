@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { ProjectData } from "@/lib/streamChat";
 import {
   Building2,
@@ -17,12 +18,16 @@ import {
   Shield,
   Sparkles,
   Loader2,
+  LineChart,
+  Handshake,
 } from "lucide-react";
 
 interface ProjectFormProps {
-  onSubmit: (data: ProjectData) => void;
+  onSubmit: (data: ProjectData & { listingType: string; financials: YearRow[] }) => void;
   isLoading: boolean;
 }
+
+export type YearRow = { year: number; revenue: string; costs: string };
 
 const fields: {
   key: keyof ProjectData;
