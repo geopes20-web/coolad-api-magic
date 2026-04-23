@@ -270,6 +270,47 @@ export type Database = {
         }
         Relationships: []
       }
+      idea_financials: {
+        Row: {
+          created_at: string
+          expected_costs_usd: number
+          expected_profit_usd: number | null
+          expected_revenue_usd: number
+          id: string
+          idea_id: string
+          notes: string | null
+          year_number: number
+        }
+        Insert: {
+          created_at?: string
+          expected_costs_usd?: number
+          expected_profit_usd?: number | null
+          expected_revenue_usd?: number
+          id?: string
+          idea_id: string
+          notes?: string | null
+          year_number: number
+        }
+        Update: {
+          created_at?: string
+          expected_costs_usd?: number
+          expected_profit_usd?: number | null
+          expected_revenue_usd?: number
+          id?: string
+          idea_id?: string
+          notes?: string | null
+          year_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_financials_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       idea_views: {
         Row: {
           id: string
@@ -622,6 +663,39 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_otp_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          phone_number: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number?: string
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -767,6 +841,9 @@ export type Database = {
         Returns: undefined
       }
       admin_unblock_user: { Args: { _target_user: string }; Returns: undefined }
+      cleanup_expired_otps: { Args: never; Returns: undefined }
+      get_admin_stats: { Args: never; Returns: Json }
+      get_idea_analytics: { Args: { _idea_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
