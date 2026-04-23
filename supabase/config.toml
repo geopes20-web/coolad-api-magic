@@ -20,3 +20,12 @@ verify_jwt = true
 
 [functions.firebase-config]
 verify_jwt = false
+
+[functions.paymob-initiate]
+verify_jwt = true
+
+[functions.whatsapp-otp-send]
+verify_jwt = true
+
+[functions.whatsapp-otp-verify]
+verify_jwt = true
