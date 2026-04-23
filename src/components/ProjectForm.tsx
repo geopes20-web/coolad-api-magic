@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { ProjectData } from "@/lib/streamChat";
 import {
   Building2,
@@ -17,12 +18,16 @@ import {
   Shield,
   Sparkles,
   Loader2,
+  LineChart,
+  Handshake,
 } from "lucide-react";
 
 interface ProjectFormProps {
-  onSubmit: (data: ProjectData) => void;
+  onSubmit: (data: ProjectData & { listingType: string; financials: YearRow[] }) => void;
   isLoading: boolean;
 }
+
+export type YearRow = { year: number; revenue: string; costs: string };
 
 const fields: {
   key: keyof ProjectData;
@@ -51,6 +56,10 @@ export default function ProjectForm({ onSubmit, isLoading }: ProjectFormProps) {
     expectedRevenue: "", teamSize: "", teamExperience: "", competitors: "",
     competitiveAdvantage: "", targetAudience: "", timeline: "", additionalInfo: "",
   });
+  const [listingType, setListingType] = useState<"sell_only" | "sell_and_execute" | "partnership">("sell_and_execute");
+  const [financials, setFinancials] = useState<YearRow[]>(
+    Array.from({ length: 5 }, (_, i) => ({ year: i + 1, revenue: "", costs: "" }))
+  );
 
   const handleChange = (key: keyof ProjectData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -58,7 +67,7 @@ export default function ProjectForm({ onSubmit, isLoading }: ProjectFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(form);
+    onSubmit({ ...form, listingType, financials });
   };
 
   const isValid = form.name && form.description && form.sector && form.capital;
@@ -107,6 +116,59 @@ export default function ProjectForm({ onSubmit, isLoading }: ProjectFormProps) {
               placeholder="أي معلومات أخرى تود إضافتها..."
               className="min-h-[80px] bg-secondary/50 border-border/50 focus:border-primary"
             />
+          </CardContent>
+        </Card>
+
+        {/* Listing Type */}
+        <Card className="md:col-span-2 shadow-card border-border/50">
+          <CardContent className="pt-5 pb-4 px-5">
+            <Label className="flex items-center gap-2 mb-3 text-sm font-semibold text-foreground">
+              <span className="text-primary"><Handshake className="h-4 w-4" /></span>
+              نوع العرض
+            </Label>
+            <RadioGroup value={listingType} onValueChange={(v) => setListingType(v as typeof listingType)} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { v: "sell_only", t: "بيع الفكرة فقط", d: "أبيع الفكرة وأتنحى" },
+                { v: "sell_and_execute", t: "بيع + تنفيذ", d: "أبيع وأشارك في التنفيذ" },
+                { v: "partnership", t: "شراكة", d: "أبحث عن شريك مستثمر" },
+              ].map(o => (
+                <label key={o.v} className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all ${listingType === o.v ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/40"}`}>
+                  <RadioGroupItem value={o.v} className="mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{o.t}</p>
+                    <p className="text-xs text-muted-foreground">{o.d}</p>
+                  </div>
+                </label>
+              ))}
+            </RadioGroup>
+          </CardContent>
+        </Card>
+
+        {/* 5-year Financial Plan */}
+        <Card className="md:col-span-2 shadow-card border-border/50">
+          <CardContent className="pt-5 pb-4 px-5">
+            <Label className="flex items-center gap-2 mb-3 text-sm font-semibold text-foreground">
+              <span className="text-primary"><LineChart className="h-4 w-4" /></span>
+              توقعات مالية لـ 5 سنوات (USD)
+            </Label>
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground font-medium">
+                <div className="col-span-2">السنة</div>
+                <div className="col-span-5">الإيرادات المتوقعة</div>
+                <div className="col-span-5">التكاليف المتوقعة</div>
+              </div>
+              {financials.map((row, idx) => (
+                <div key={row.year} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-2 text-sm text-foreground font-medium">السنة {row.year}</div>
+                  <Input className="col-span-5 bg-secondary/50 border-border/50" placeholder="100000"
+                    value={row.revenue}
+                    onChange={(e) => setFinancials(p => p.map((r, i) => i === idx ? { ...r, revenue: e.target.value } : r))} />
+                  <Input className="col-span-5 bg-secondary/50 border-border/50" placeholder="60000"
+                    value={row.costs}
+                    onChange={(e) => setFinancials(p => p.map((r, i) => i === idx ? { ...r, costs: e.target.value } : r))} />
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
