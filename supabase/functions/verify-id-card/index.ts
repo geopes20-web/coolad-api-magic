@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
         reason = `National ID mismatch: you entered ${normEntered}, ID card shows ${normExtracted}`;
       }
     } else if (!normExtracted) {
-      reason = "Could not read national ID from card";
+      reason = null;
     } else if (normEntered && normEntered.length !== 14) {
       reason = "National ID must be exactly 14 digits";
     }
@@ -209,6 +209,9 @@ Deno.serve(async (req) => {
     } else if (reason) {
       updates.status = "rejected";
       updates.rejection_reason = reason;
+    } else {
+      updates.status = "pending";
+      updates.rejection_reason = "Needs manual admin review: OCR could not confidently read all required fields.";
     }
     await supabase.from("kyc_verifications").update(updates).eq("user_id", userId);
 
