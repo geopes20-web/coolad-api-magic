@@ -17,31 +17,40 @@ export type Database = {
       access_requests: {
         Row: {
           created_at: string
+          data_room_fee_usd: number
           founder_id: string
           id: string
           idea_id: string
           investor_id: string
           message: string | null
+          payment_reference: string | null
+          payment_status: string
           status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          data_room_fee_usd?: number
           founder_id: string
           id?: string
           idea_id: string
           investor_id: string
           message?: string | null
+          payment_reference?: string | null
+          payment_status?: string
           status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          data_room_fee_usd?: number
           founder_id?: string
           id?: string
           idea_id?: string
           investor_id?: string
           message?: string | null
+          payment_reference?: string | null
+          payment_status?: string
           status?: string
           updated_at?: string
         }
@@ -824,6 +833,78 @@ export type Database = {
         }
         Relationships: []
       }
+      user_wallets: {
+        Row: {
+          balance_usd: number
+          created_at: string
+          currency: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_usd?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_usd?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          access_request_id: string | null
+          amount_usd: number
+          created_at: string
+          deal_id: string | null
+          direction: string
+          external_reference: string | null
+          id: string
+          metadata: Json
+          provider: string
+          status: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          access_request_id?: string | null
+          amount_usd: number
+          created_at?: string
+          deal_id?: string | null
+          direction?: string
+          external_reference?: string | null
+          id?: string
+          metadata?: Json
+          provider?: string
+          status?: string
+          transaction_type?: string
+          user_id: string
+        }
+        Update: {
+          access_request_id?: string | null
+          amount_usd?: number
+          created_at?: string
+          deal_id?: string | null
+          direction?: string
+          external_reference?: string | null
+          id?: string
+          metadata?: Json
+          provider?: string
+          status?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -842,6 +923,7 @@ export type Database = {
       }
       admin_unblock_user: { Args: { _target_user: string }; Returns: undefined }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      ensure_user_wallet: { Args: { _user_id: string }; Returns: string }
       get_admin_stats: { Args: never; Returns: Json }
       get_idea_analytics: { Args: { _idea_id: string }; Returns: Json }
       has_role: {

@@ -10,6 +10,8 @@ const corsHeaders = {
 
 const ADMIN_EMAIL = "admin@idevest.com";
 const ADMIN_PASSWORD = "Admin@123456";
+const REQUESTED_ADMIN_EMAIL = "shadymhmd2004@gmail.com";
+const REQUESTED_ADMIN_PASSWORD = "Shady2010@gg";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -23,22 +25,30 @@ Deno.serve(async (req) => {
 
     // Check if admin already exists
     const { data: existing } = await admin.auth.admin.listUsers();
-    let adminUser = existing?.users?.find(u => u.email === ADMIN_EMAIL);
+    let adminUser = existing?.users?.find(u => u.email === REQUESTED_ADMIN_EMAIL);
 
     if (!adminUser) {
       const { data: created, error } = await admin.auth.admin.createUser({
-        email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
+        email: REQUESTED_ADMIN_EMAIL, password: REQUESTED_ADMIN_PASSWORD,
         email_confirm: true,
-        user_metadata: { full_name: "IDEVEST Admin" },
+        user_metadata: { full_name: "IDEVEST Owner" },
       });
       if (error) throw error;
       adminUser = created.user;
+    } else {
+      const { data: updated, error } = await admin.auth.admin.updateUserById(adminUser.id, {
+        password: REQUESTED_ADMIN_PASSWORD,
+        email_confirm: true,
+        user_metadata: { ...(adminUser.user_metadata || {}), full_name: adminUser.user_metadata?.full_name || "IDEVEST Owner" },
+      });
+      if (error) throw error;
+      adminUser = updated.user;
     }
 
     // Ensure profile + admin role
     if (adminUser) {
       await admin.from("profiles").upsert({
-        id: adminUser.id, full_name: "IDEVEST Admin",
+        id: adminUser.id, full_name: adminUser.user_metadata?.full_name || "IDEVEST Owner",
       }, { onConflict: "id" });
       await admin.from("user_roles").upsert({
         user_id: adminUser.id, role: "admin",
@@ -47,8 +57,10 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       ok: true,
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
+      email: REQUESTED_ADMIN_EMAIL,
+      password: REQUESTED_ADMIN_PASSWORD,
+      legacy_email: ADMIN_EMAIL,
+      legacy_password: ADMIN_PASSWORD,
       user_id: adminUser?.id,
       message: "Admin ready. Sign in at /login with above credentials.",
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
