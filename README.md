@@ -7,11 +7,13 @@
 ## 🔑 حساب الأدمن
 
 ```
-Email:    admin@idevest.com
-Password: Admin@123456
+Email:    shadymhmd2004@gmail.com
+Password: Shady2010@gg
 ```
 
 افتح `/login`، سجّل دخول بهذه البيانات، سيتم تحويلك تلقائيًا إلى `/admin`.
+
+> يوجد حساب Legacy احتياطي: `admin@idevest.com / Admin@123456`، لكن الحساب الأساسي الحالي هو الإيميل أعلاه.
 
 ---
 
@@ -94,6 +96,8 @@ bun run dev
 | `/chat/:id` | محادثة المؤسس بعد NDA |
 | `/my-deals` | الصفقات الخاصة بك |
 | `/admin` | لوحة الأدمن (KYC / Users / Ideas) |
+
+> لوحة الأدمن الحالية تشمل: إحصائيات عامة، مراجعة KYC، طلبات Data Room، المدفوعات، البلاغات، الأفكار، والمستخدمين.
 
 ---
 
