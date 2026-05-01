@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Shield, Users as UsersIcon, FileCheck, Lightbulb, Eye, Check, X,
-  AlertCircle, BarChart3, CreditCard, Flag, LockKeyhole, DollarSign,
+  AlertCircle, CreditCard, Flag, DollarSign,
 } from "lucide-react";
 
 type KycRow = {
