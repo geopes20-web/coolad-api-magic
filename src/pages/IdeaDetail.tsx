@@ -32,7 +32,7 @@ interface IdeaData {
 export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const navigate = useNavigate();
   const [idea, setIdea] = useState<IdeaData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ export default function IdeaDetail() {
   );
 
   const isOwner = user?.id === idea.founder_id;
-  const hasFullAccess = isOwner || accessStatus === "approved";
+  const hasFullAccess = isOwner || userRole === "admin" || accessStatus === "approved";
   const decision = (idea as Record<string, unknown>).decision as string || "pending";
   const executionScore = (idea as Record<string, unknown>).execution_score as number || 0;
   const investmentScore = (idea as Record<string, unknown>).investment_score as number || 0;
@@ -170,26 +170,27 @@ export default function IdeaDetail() {
         </div>
       </motion.div>
 
-      {/* Scores */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {scores.map((s, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="glass rounded-xl p-4 shadow-glass text-center">
-            <s.icon className={`h-5 w-5 mx-auto mb-2 ${s.value >= 70 ? "text-primary" : s.value >= 40 ? "text-yellow-500" : "text-destructive"}`} />
-            <div className={`text-2xl font-bold mb-1 ${s.value >= 70 ? "text-primary" : s.value >= 40 ? "text-yellow-500" : "text-destructive"}`}>{s.value}</div>
-            <Progress value={s.value} className="h-1.5 mb-1" />
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-          </motion.div>
-        ))}
-      </div>
+      {hasFullAccess && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          {scores.map((s, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+              className="glass rounded-xl p-4 shadow-glass text-center">
+              <s.icon className={`h-5 w-5 mx-auto mb-2 ${s.value >= 70 ? "text-primary" : s.value >= 40 ? "text-yellow-500" : "text-destructive"}`} />
+              <div className={`text-2xl font-bold mb-1 ${s.value >= 70 ? "text-primary" : s.value >= 40 ? "text-yellow-500" : "text-destructive"}`}>{s.value}</div>
+              <Progress value={s.value} className="h-1.5 mb-1" />
+              <div className="text-xs text-muted-foreground">{s.label}</div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="glass rounded-2xl shadow-glass overflow-hidden">
         <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
           <TabsTrigger value="overview">{t.ideaDetail.overview}</TabsTrigger>
-          <TabsTrigger value="evaluation">{t.ideaDetail.aiEvaluation}</TabsTrigger>
+          {hasFullAccess && <TabsTrigger value="evaluation">{t.ideaDetail.aiEvaluation}</TabsTrigger>}
           {hasFullAccess && <TabsTrigger value="details">{t.ideaDetail.financialPotential}</TabsTrigger>}
-          {(idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">{t.ideaDetail.recommendations}</TabsTrigger>}
+          {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">{t.ideaDetail.recommendations}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="overview" className="p-6">
@@ -203,13 +204,13 @@ export default function IdeaDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="evaluation" className="p-6">
+        {hasFullAccess && <TabsContent value="evaluation" className="p-6">
           {idea.ai_evaluation ? (
             <div className="prose prose-sm max-w-none text-foreground" dangerouslySetInnerHTML={{ __html: markdownToHtml(idea.ai_evaluation) }} />
           ) : (
             <p className="text-muted-foreground">No AI evaluation available.</p>
           )}
-        </TabsContent>
+        </TabsContent>}
 
         {hasFullAccess && (
           <TabsContent value="details" className="p-6">
@@ -236,7 +237,7 @@ export default function IdeaDetail() {
           </TabsContent>
         )}
 
-        {(idea as Record<string, unknown>).ai_recommendations && (
+        {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && (
           <TabsContent value="recommendations" className="p-6">
             <div className="prose prose-sm max-w-none text-foreground"
               dangerouslySetInnerHTML={{ __html: markdownToHtml((idea as Record<string, unknown>).ai_recommendations as string) }} />
