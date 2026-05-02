@@ -71,11 +71,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Message too long" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Block enforcement — refuse all sends from blocked accounts
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: senderProfile } = await admin
+      .from("profiles").select("is_blocked, blocked_reason").eq("id", user.id).maybeSingle();
+    if (senderProfile?.is_blocked) {
+      return new Response(JSON.stringify({
+        error: "blocked_user",
+        message: "Your account is blocked",
+        reason: senderProfile.blocked_reason || null,
+      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Run server-side filter
-    const violations = detectViolations(content);
+    let violations = detectViolations(content);
+
+    // Cross-message obfuscation: concatenate the user's last short messages
+    // to the same receiver in the past 2 minutes and re-run detection.
+    if (violations.length === 0) {
+      const { data: recent } = await admin
+        .from("messages")
+        .select("content, created_at")
+        .eq("sender_id", user.id)
+        .eq("receiver_id", receiver_id)
+        .gte("created_at", new Date(Date.now() - 120_000).toISOString())
+        .order("created_at", { ascending: true })
+        .limit(20);
+      const fragments = (recent || []).map((m: any) => String(m.content || "")).filter(s => s.length <= 30);
+      if (fragments.length > 0) {
+        const combined = fragments.join("") + content;
+        const combinedViolations = detectViolations(combined);
+        if (combinedViolations.length > 0) {
+          violations = combinedViolations.map(v => `cross_msg_${v}`);
+        }
+      }
+    }
+
     if (violations.length > 0) {
       // Log the violation
-      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
       await admin.from("chat_violations").insert({
         user_id: user.id,
         receiver_id,

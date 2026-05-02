@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BlockedBanner from "@/components/BlockedBanner";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -68,6 +69,7 @@ const App = () => (
               <Navbar />
               <AnimatedRoutes />
               <Footer />
+              <BlockedBanner />
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>
