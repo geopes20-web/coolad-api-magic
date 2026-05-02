@@ -53,13 +53,13 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   useEffect(() => {
     if (!user || !ideaId) return;
     (async () => {
-      const { data: idea } = await sb.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
+      const { data: idea } = await supabase.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
       if (!idea) return;
       const founderIsMe = idea.founder_id === user.id;
       setIsFounder(founderIsMe);
       const founderId = idea.founder_id;
       const investorId = founderIsMe ? otherUserId : user.id;
-      const { data: deal } = await sb.from("deals").select("*")
+      const { data: deal } = await supabase.from("deals").select("*")
         .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       setActiveDeal(deal || null);
@@ -68,11 +68,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
 
   const refreshDeal = async () => {
     if (!user || !ideaId) return;
-    const { data: idea } = await sb.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
+    const { data: idea } = await supabase.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
     if (!idea) return;
     const founderId = idea.founder_id;
     const investorId = idea.founder_id === user.id ? otherUserId : user.id;
-    const { data: deal } = await sb.from("deals").select("*")
+    const { data: deal } = await supabase.from("deals").select("*")
       .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     setActiveDeal(deal || null);
@@ -83,11 +83,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const amt = Number(amount);
     if (!amt || amt <= 0) { toast({ title: isAr ? "أدخل المبلغ" : "Enter amount", variant: "destructive" }); return; }
     setProposing(true);
-    const { data: idea } = await sb.from("ideas").select("founder_id, title").eq("id", ideaId).maybeSingle();
+    const { data: idea } = await supabase.from("ideas").select("founder_id, title").eq("id", ideaId).maybeSingle();
     if (!idea) { setProposing(false); return; }
     const founderId = idea.founder_id;
     const investorId = founderId === user.id ? otherUserId : user.id;
-    const { error } = await sb.from("deals").insert({
+    const { error } = await supabase.from("deals").insert({
       idea_id: ideaId, founder_id: founderId, investor_id: investorId,
       investment_amount_usd: amt,
       equity_percentage: equity ? Number(equity) : null,
@@ -112,7 +112,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       : { investor_signed_at: new Date().toISOString() };
     const bothSigned = isFounder ? !!activeDeal.investor_signed_at : !!activeDeal.founder_signed_at;
     if (bothSigned) patch.status = "signed";
-    const { error } = await sb.from("deals").update(patch).eq("id", activeDeal.id);
+    const { error } = await supabase.from("deals").update(patch).eq("id", activeDeal.id);
     setSigning(false);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: isAr ? "تم التوقيع" : "Signed", description: bothSigned ? (isAr ? "العقد جاهز للدفع" : "Contract ready for payment") : (isAr ? "بانتظار الطرف الآخر" : "Awaiting counter-party") });
@@ -122,7 +122,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handlePay = async () => {
     if (!activeDeal || !ideaId) return;
     setPaying(true);
-    const { data, error } = await sb.functions.invoke("paymob-initiate", {
+    const { data, error } = await supabase.functions.invoke("paymob-initiate", {
       body: {
         idea_id: ideaId,
         amount_usd: activeDeal.investment_amount_usd,
