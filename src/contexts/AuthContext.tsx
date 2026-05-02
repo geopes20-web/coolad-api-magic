@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   userRole: string | null;
+  isBlocked: boolean;
+  blockedReason: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -17,14 +19,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
   const loadUserRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-    setUserRole(data?.role ?? null);
+    const [{ data: roleData }, { data: profileData }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      supabase.from("profiles").select("is_blocked, blocked_reason").eq("id", userId).maybeSingle(),
+    ]);
+    setUserRole(roleData?.role ?? null);
+    setIsBlocked(!!(profileData as any)?.is_blocked);
+    setBlockedReason(((profileData as any)?.blocked_reason as string) ?? null);
     setLoading(false);
   };
 
@@ -50,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) loadUserRole(session.user.id);
-      else setLoading(false);
+      else { setIsBlocked(false); setBlockedReason(null); setLoading(false); }
     });
 
     return () => subscription.unsubscribe();
@@ -61,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isBlocked, blockedReason, signOut }}>
       {children}
     </AuthContext.Provider>
   );
