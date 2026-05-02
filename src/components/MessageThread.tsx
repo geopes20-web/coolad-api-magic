@@ -9,7 +9,6 @@ import { Send, Loader2, ArrowLeft, User, ShieldAlert, Handshake, FileSignature, 
 import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { supabase as sb } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
