@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User, ShieldAlert } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, ShieldAlert, Handshake, FileSignature, CreditCard, CheckCircle2 } from "lucide-react";
 import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -32,6 +35,117 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Deal proposal state
+  const [activeDeal, setActiveDeal] = useState<any>(null);
+  const [isFounder, setIsFounder] = useState(false);
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [equity, setEquity] = useState("");
+  const [valuation, setValuation] = useState("");
+  const [terms, setTerms] = useState("");
+  const [proposing, setProposing] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [paying, setPaying] = useState(false);
+
+  const isAr = typeof document !== "undefined" && document.documentElement.lang === "ar";
+
+  // Load most recent deal between these two parties for this idea
+  useEffect(() => {
+    if (!user || !ideaId) return;
+    (async () => {
+      const { data: idea } = await sb.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
+      if (!idea) return;
+      const founderIsMe = idea.founder_id === user.id;
+      setIsFounder(founderIsMe);
+      const founderId = idea.founder_id;
+      const investorId = founderIsMe ? otherUserId : user.id;
+      const { data: deal } = await sb.from("deals").select("*")
+        .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      setActiveDeal(deal || null);
+    })();
+  }, [user, ideaId, otherUserId]);
+
+  const refreshDeal = async () => {
+    if (!user || !ideaId) return;
+    const { data: idea } = await sb.from("ideas").select("founder_id").eq("id", ideaId).maybeSingle();
+    if (!idea) return;
+    const founderId = idea.founder_id;
+    const investorId = idea.founder_id === user.id ? otherUserId : user.id;
+    const { data: deal } = await sb.from("deals").select("*")
+      .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    setActiveDeal(deal || null);
+  };
+
+  const handlePropose = async () => {
+    if (!user || !ideaId) return;
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { toast({ title: isAr ? "أدخل المبلغ" : "Enter amount", variant: "destructive" }); return; }
+    setProposing(true);
+    const { data: idea } = await sb.from("ideas").select("founder_id, title").eq("id", ideaId).maybeSingle();
+    if (!idea) { setProposing(false); return; }
+    const founderId = idea.founder_id;
+    const investorId = founderId === user.id ? otherUserId : user.id;
+    const { error } = await sb.from("deals").insert({
+      idea_id: ideaId, founder_id: founderId, investor_id: investorId,
+      investment_amount_usd: amt,
+      equity_percentage: equity ? Number(equity) : null,
+      valuation_usd: valuation ? Number(valuation) : null,
+      contract_terms: terms || `Investment of $${amt} in "${idea.title}"`,
+      status: "draft" as any,
+      payment_status: "pending",
+    } as any);
+    setProposing(false);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    setProposeOpen(false);
+    setAmount(""); setEquity(""); setValuation(""); setTerms("");
+    toast({ title: isAr ? "تم إرسال العرض" : "Proposal sent", description: isAr ? "بانتظار توقيع الطرف الآخر" : "Awaiting the other party's signature" });
+    await refreshDeal();
+  };
+
+  const handleSign = async () => {
+    if (!user || !activeDeal) return;
+    setSigning(true);
+    const patch: any = isFounder
+      ? { founder_signed_at: new Date().toISOString() }
+      : { investor_signed_at: new Date().toISOString() };
+    const bothSigned = isFounder ? !!activeDeal.investor_signed_at : !!activeDeal.founder_signed_at;
+    if (bothSigned) patch.status = "signed";
+    const { error } = await sb.from("deals").update(patch).eq("id", activeDeal.id);
+    setSigning(false);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: isAr ? "تم التوقيع" : "Signed", description: bothSigned ? (isAr ? "العقد جاهز للدفع" : "Contract ready for payment") : (isAr ? "بانتظار الطرف الآخر" : "Awaiting counter-party") });
+    await refreshDeal();
+  };
+
+  const handlePay = async () => {
+    if (!activeDeal || !ideaId) return;
+    setPaying(true);
+    const { data, error } = await sb.functions.invoke("paymob-initiate", {
+      body: {
+        idea_id: ideaId,
+        amount_usd: activeDeal.investment_amount_usd,
+        equity_percentage: activeDeal.equity_percentage,
+        valuation_usd: activeDeal.valuation_usd,
+        contract_terms: activeDeal.contract_terms,
+      },
+    });
+    setPaying(false);
+    if (error || (data as any)?.error) {
+      toast({ title: "Payment error", description: (data as any)?.error || error?.message || "Failed", variant: "destructive" });
+      return;
+    }
+    const url = (data as any)?.iframe_url;
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      toast({ title: isAr ? "تم فتح بوابة الدفع" : "Payment opened", description: isAr ? "أكمل الدفع في النافذة الجديدة" : "Complete the payment in the new tab" });
+    } else {
+      toast({ title: isAr ? "تم إنشاء الصفقة" : "Deal created", description: isAr ? "بوابة الدفع غير مهيأة بالكامل" : "Payment iframe not configured" });
+    }
+    await refreshDeal();
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -93,13 +207,17 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     });
     setSending(false);
 
-    if (error || (data as any)?.error === "blocked") {
-      const isBlocked = (data as any)?.error === "blocked";
+    const errCode = (data as any)?.error;
+    if (error || errCode === "blocked" || errCode === "blocked_user") {
+      const isBlockedMsg = errCode === "blocked";
+      const isBlockedUser = errCode === "blocked_user";
       toast({
-        title: isBlocked ? "⚠️" : t.common.error,
-        description: isBlocked
-          ? (document.documentElement.lang === "ar" ? BLOCKED_MESSAGE_AR : BLOCKED_MESSAGE_EN)
-          : (error?.message || "Failed to send"),
+        title: (isBlockedMsg || isBlockedUser) ? "⚠️" : t.common.error,
+        description: isBlockedUser
+          ? (isAr ? "تم حظر حسابك ولا يمكنك إرسال الرسائل." : "Your account is blocked and cannot send messages.")
+          : isBlockedMsg
+            ? (isAr ? BLOCKED_MESSAGE_AR : BLOCKED_MESSAGE_EN)
+            : (error?.message || "Failed to send"),
         variant: "destructive",
       });
     } else {
@@ -115,8 +233,50 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
           <User className="h-4 w-4 text-muted-foreground" />
         </div>
-        <span className="font-medium text-foreground">{otherUserName}</span>
+        <span className="font-medium text-foreground flex-1">{otherUserName}</span>
+        {ideaId && !activeDeal && (
+          <Button size="sm" variant="outline" onClick={() => setProposeOpen(true)}>
+            <Handshake className="h-4 w-4 me-1" />{isAr ? "اقتراح صفقة" : "Propose Deal"}
+          </Button>
+        )}
       </div>
+
+      {/* Active deal banner */}
+      {activeDeal && (
+        <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs">
+              <div className="font-semibold text-foreground">
+                💼 ${Number(activeDeal.investment_amount_usd).toLocaleString()}
+                {activeDeal.equity_percentage ? ` · ${activeDeal.equity_percentage}% equity` : ""}
+              </div>
+              <div className="text-muted-foreground mt-0.5">
+                {isAr ? "المؤسس: " : "Founder: "}
+                {activeDeal.founder_signed_at ? <CheckCircle2 className="h-3 w-3 inline text-primary" /> : "—"}
+                {" · "}
+                {isAr ? "المستثمر: " : "Investor: "}
+                {activeDeal.investor_signed_at ? <CheckCircle2 className="h-3 w-3 inline text-primary" /> : "—"}
+                {" · "}
+                {activeDeal.payment_status === "paid" ? "✅ Paid" : activeDeal.payment_status}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {((isFounder && !activeDeal.founder_signed_at) || (!isFounder && !activeDeal.investor_signed_at)) && (
+                <Button size="sm" onClick={handleSign} disabled={signing} className="gradient-primary border-0 text-primary-foreground">
+                  {signing ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <FileSignature className="h-3 w-3 me-1" />}
+                  {isAr ? "توقيع" : "Sign"}
+                </Button>
+              )}
+              {activeDeal.founder_signed_at && activeDeal.investor_signed_at && activeDeal.payment_status !== "paid" && !isFounder && (
+                <Button size="sm" onClick={handlePay} disabled={paying} className="gradient-primary border-0 text-primary-foreground">
+                  {paying ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <CreditCard className="h-3 w-3 me-1" />}
+                  {isAr ? "ادفع الآن" : "Pay now"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -157,6 +317,47 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
           <Send className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Propose Deal dialog */}
+      <Dialog open={proposeOpen} onOpenChange={setProposeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isAr ? "اقتراح صفقة استثمار" : "Propose Investment Deal"}</DialogTitle>
+            <DialogDescription>
+              {isAr
+                ? "حدد شروط الاستثمار. يجب توقيع الطرفين قبل تفعيل الدفع عبر Paymob (وضع الاختبار)."
+                : "Set the investment terms. Both parties must sign before Paymob (test mode) payment is enabled."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">{isAr ? "المبلغ (USD)" : "Amount (USD)"} *</label>
+              <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">{isAr ? "الحصة %" : "Equity %"}</label>
+                <Input type="number" step="0.1" value={equity} onChange={e => setEquity(e.target.value)} placeholder="10" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">{isAr ? "التقييم (USD)" : "Valuation (USD)"}</label>
+                <Input type="number" value={valuation} onChange={e => setValuation(e.target.value)} placeholder="100000" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">{isAr ? "ملاحظات / شروط إضافية" : "Notes / extra terms"}</label>
+              <Textarea rows={3} value={terms} onChange={e => setTerms(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProposeOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
+            <Button onClick={handlePropose} disabled={proposing} className="gradient-primary border-0 text-primary-foreground">
+              {proposing ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <Handshake className="h-4 w-4 me-1" />}
+              {isAr ? "إرسال العرض" : "Send Proposal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
