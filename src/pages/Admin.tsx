@@ -181,10 +181,11 @@ export default function Admin() {
           </div>
 
           <Tabs defaultValue="kyc" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 mb-6 h-auto">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 mb-6 h-auto">
               <TabsTrigger value="kyc">KYC ({kycList.filter(k => k.status === "pending").length})</TabsTrigger>
               <TabsTrigger value="access">Data Room ({accessRequests.length})</TabsTrigger>
               <TabsTrigger value="payments">Payments ({deals.length})</TabsTrigger>
+              <TabsTrigger value="transfers">Transfers ({paymentEvents.length})</TabsTrigger>
               <TabsTrigger value="reports">Reports ({reports.filter(r => r.status === "open").length})</TabsTrigger>
               <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
               <TabsTrigger value="users">Users ({users.length})</TabsTrigger>
@@ -196,16 +197,57 @@ export default function Admin() {
 
             <TabsContent value="payments" className="space-y-2">{deals.map(d => <Row key={d.id} title={`$${d.investment_amount_usd?.toLocaleString()} investment`} sub={`Fee: $${d.platform_fee_amount || 0} · Escrow: ${d.escrow_status || "none"}`} status={d.payment_status}><Link to={`/idea/${d.idea_id}`}><Button size="sm" variant="outline"><Eye className="h-4 w-4" /></Button></Link></Row>)}</TabsContent>
 
+            <TabsContent value="transfers" className="space-y-2">
+              {paymentEvents.length === 0 ? <p className="text-sm text-muted-foreground p-4">{isAr ? "لا توجد تحويلات بعد" : "No transfers yet"}</p> : paymentEvents.map(pe => {
+                const inv = pe.raw_payload?.obj?.payment_key_claims?.billing_data || pe.raw_payload?.billing_data || {};
+                const card = pe.raw_payload?.obj?.source_data?.pan || pe.raw_payload?.source_data?.pan;
+                return <div key={pe.id} className="glass rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="font-medium text-foreground">{pe.provider.toUpperCase()} · ${pe.amount_usd?.toLocaleString() || 0} {pe.currency}</div>
+                    <StatusBadge status={pe.status} />
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div>Ref: <span className="font-mono">{pe.external_reference || "—"}</span></div>
+                    <div>Deal: {pe.deal_id ? <Link to={`/idea/${deals.find(d => d.id === pe.deal_id)?.idea_id || ""}`} className="text-primary underline">{pe.deal_id.slice(0,8)}…</Link> : "—"}</div>
+                    <div>From: {inv.first_name || ""} {inv.last_name || ""} {inv.email ? `· ${inv.email}` : ""}</div>
+                    {card && <div>Card: ****{String(card).slice(-4)}</div>}
+                    <div>{new Date(pe.created_at).toLocaleString()}</div>
+                  </div>
+                </div>;
+              })}
+            </TabsContent>
+
             <TabsContent value="reports" className="space-y-2">{reports.map(r => <Row key={r.id} title={`${r.target_type}: ${r.reason}`} sub={r.details || r.target_id} status={r.status}><Button size="sm" variant="outline" onClick={() => updateReport(r.id, "dismissed")}>{isAr ? "تجاهل" : "Dismiss"}</Button><Button size="sm" onClick={() => updateReport(r.id, "resolved")} className="gradient-primary border-0 text-primary-foreground">{isAr ? "حل" : "Resolve"}</Button></Row>)}</TabsContent>
 
             <TabsContent value="ideas" className="space-y-2">{ideas.map(i => <Row key={i.id} title={i.title} sub={`${i.sector} · ${i.listing_type || "—"} · Score ${i.ai_score ?? "—"}`} status={i.status}><Button size="sm" variant="outline" onClick={() => updateIdeaStatus(i.id, "rejected")}><X className="h-4 w-4" /></Button><Button size="sm" onClick={() => updateIdeaStatus(i.id, "published")} className="gradient-primary border-0 text-primary-foreground"><Check className="h-4 w-4" /></Button></Row>)}</TabsContent>
 
-            <TabsContent value="users" className="space-y-2">{users.map(u => <Row key={u.id} title={u.full_name || "—"} sub={`${u.phone_number || (isAr ? "بدون هاتف" : "No phone")} · ${new Date(u.created_at).toLocaleDateString()}`} status={u.is_blocked ? "blocked" : "active"}>{u.is_blocked ? <Button size="sm" variant="outline" onClick={() => unblockUser(u.id)}>{isAr ? "إلغاء حظر" : "Unblock"}</Button> : <Button size="sm" variant="outline" className="text-destructive" onClick={() => blockUser(u.id)}>{isAr ? "حظر" : "Block"}</Button>}</Row>)}</TabsContent>
+            <TabsContent value="users" className="space-y-2">
+              <div className="flex justify-end mb-2"><Button size="sm" onClick={() => setCreateAdminOpen(true)} className="gradient-primary border-0 text-primary-foreground"><UserPlus className="h-4 w-4 me-1" />{isAr ? "إضافة أدمن" : "Add Admin"}</Button></div>
+              {users.map(u => <Row key={u.id} title={u.full_name || "—"} sub={`${u.phone_number || (isAr ? "بدون هاتف" : "No phone")} · ${new Date(u.created_at).toLocaleDateString()}`} status={u.is_blocked ? "blocked" : "active"}>
+                {u.is_blocked ? <Button size="sm" variant="outline" onClick={() => unblockUser(u.id)}>{isAr ? "إلغاء حظر" : "Unblock"}</Button> : <Button size="sm" variant="outline" className="text-destructive" onClick={() => blockUser(u.id)}>{isAr ? "حظر" : "Block"}</Button>}
+                <Button size="sm" variant="outline" className="text-destructive" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+              </Row>)}
+            </TabsContent>
           </Tabs>
         </>
       )}
 
       {selectedKyc && <KycModal kyc={selectedKyc} isAr={isAr} rejectReason={rejectReason} setRejectReason={setRejectReason} onClose={() => setSelectedKyc(null)} onApprove={approveKyc} onReject={rejectKyc} />}
+
+      <Dialog open={createAdminOpen} onOpenChange={setCreateAdminOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{isAr ? "إنشاء حساب أدمن جديد" : "Create New Admin"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><label className="text-xs text-muted-foreground">Email *</label><Input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} /></div>
+            <div><label className="text-xs text-muted-foreground">Password *</label><Input type="password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} /></div>
+            <div><label className="text-xs text-muted-foreground">{isAr ? "الاسم" : "Full name"}</label><Input value={newAdminName} onChange={e => setNewAdminName(e.target.value)} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateAdminOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
+            <Button onClick={createAdmin} disabled={creatingAdmin} className="gradient-primary border-0 text-primary-foreground">{creatingAdmin ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <UserPlus className="h-4 w-4 me-1" />}{isAr ? "إنشاء" : "Create"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
