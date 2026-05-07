@@ -88,8 +88,18 @@ serve(async (req) => {
         payment_reference: externalRef,
         escrow_hold_id: isAuth ? externalRef : null,
         escrow_status: isCapture ? "captured" : isAuth ? "held" : "completed",
-        status: isCapture ? "completed" : "signed",
+        status: "completed",
       }).eq("id", dealId);
+
+      // Auto-generate a simple contract record
+      try {
+        const { data: deal } = await admin.from("deals").select("*, ideas(title)").eq("id", dealId).maybeSingle();
+        if (deal && !deal.contract_url) {
+          const html = `<!doctype html><html><head><meta charset="utf-8"><title>Investment Contract</title><style>body{font-family:Arial;max-width:780px;margin:40px auto;padding:24px;color:#111}h1{border-bottom:2px solid #000;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:8px;border:1px solid #ccc}.sig{margin-top:48px;display:flex;justify-content:space-between}</style></head><body><h1>IDEVEST — Investment Agreement</h1><p>This agreement records the investment transaction completed via the IDEVEST platform.</p><table><tr><td><b>Project</b></td><td>${deal.ideas?.title || ""}</td></tr><tr><td><b>Investment Amount</b></td><td>$${Number(deal.investment_amount_usd).toLocaleString()}</td></tr><tr><td><b>Equity</b></td><td>${deal.equity_percentage || "—"}%</td></tr><tr><td><b>Valuation</b></td><td>$${Number(deal.valuation_usd || 0).toLocaleString()}</td></tr><tr><td><b>Platform Fee (15%)</b></td><td>$${deal.platform_fee_amount || 0}</td></tr><tr><td><b>Paymob Transaction ID</b></td><td>${externalRef}</td></tr><tr><td><b>Date</b></td><td>${new Date().toISOString()}</td></tr></table><p>${deal.contract_terms || ""}</p><div class="sig"><div>Founder signed: ${deal.founder_signed_at || "—"}</div><div>Investor signed: ${deal.investor_signed_at || "—"}</div></div></body></html>`;
+          const dataUrl = `data:text/html;base64,${btoa(unescape(encodeURIComponent(html)))}`;
+          await admin.from("deals").update({ contract_url: dataUrl }).eq("id", dealId);
+        }
+      } catch (e) { console.error("contract gen failed", e); }
     } else if (dealId && status === "failed") {
       await admin.from("deals").update({ payment_status: "failed" }).eq("id", dealId);
     }
