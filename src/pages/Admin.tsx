@@ -11,10 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Shield, Users as UsersIcon, FileCheck, Lightbulb, Eye, Check, X,
-  AlertCircle, CreditCard, Flag, DollarSign,
+  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus,
 } from "lucide-react";
 
 type KycRow = {
