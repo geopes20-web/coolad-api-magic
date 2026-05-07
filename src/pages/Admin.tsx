@@ -29,6 +29,7 @@ type KycRow = {
 type ProfileFull = { id: string; full_name: string; phone_number: string | null; created_at: string; is_blocked?: boolean; blocked_reason?: string | null };
 type IdeaRow = { id: string; title: string; sector: string; status: string; ai_score: number | null; founder_id: string; created_at: string; listing_type?: string | null };
 type DealRow = { id: string; idea_id: string; investment_amount_usd: number; platform_fee_amount: number | null; payment_status: string; escrow_status: string | null; status: string; created_at: string };
+type PaymentEvent = { id: string; deal_id: string | null; provider: string; external_reference: string | null; amount_usd: number | null; currency: string | null; status: string; event_type: string; created_at: string; raw_payload: any };
 type ReportRow = { id: string; target_type: string; target_id: string; reason: string; details: string | null; status: string; created_at: string };
 type AccessRow = { id: string; idea_id: string; investor_id: string; founder_id: string; status: string; payment_status?: string; data_room_fee_usd?: number; created_at: string; message?: string | null; ideas?: { title: string } | null };
 type Stats = Record<string, number>;
@@ -45,15 +46,21 @@ export default function Admin() {
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRow[]>([]);
+  const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKyc, setSelectedKyc] = useState<KycRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [createAdminOpen, setCreateAdminOpen] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newAdminName, setNewAdminName] = useState("");
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
   const isAdmin = userRole === "admin";
 
   const loadAll = async () => {
     setLoading(true);
-    const [s, k, p, i, d, r, a] = await Promise.all([
+    const [s, k, p, i, d, r, a, pe] = await Promise.all([
       supabase.rpc("get_admin_stats"),
       supabase.from("kyc_verifications").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id,full_name,phone_number,created_at,is_blocked,blocked_reason").order("created_at", { ascending: false }),
@@ -61,6 +68,7 @@ export default function Admin() {
       supabase.from("deals").select("id,idea_id,investment_amount_usd,platform_fee_amount,payment_status,escrow_status,status,created_at").order("created_at", { ascending: false }),
       supabase.from("reports").select("id,target_type,target_id,reason,details,status,created_at").order("created_at", { ascending: false }),
       (supabase as any).from("access_requests").select("id,idea_id,investor_id,founder_id,status,payment_status,data_room_fee_usd,message,created_at,ideas(title)").order("created_at", { ascending: false }),
+      supabase.from("payment_events").select("*").order("created_at", { ascending: false }).limit(200),
     ]);
     setStats((s.data as Stats) || {});
     setKycList((k.data as KycRow[]) || []);
@@ -69,6 +77,7 @@ export default function Admin() {
     setDeals((d.data as DealRow[]) || []);
     setReports((r.data as ReportRow[]) || []);
     setAccessRequests((a.data as AccessRow[]) || []);
+    setPaymentEvents((pe.data as PaymentEvent[]) || []);
     setLoading(false);
   };
 
@@ -121,6 +130,26 @@ export default function Admin() {
     const { error } = await supabase.rpc("admin_unblock_user", { _target_user: uid });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: isAr ? "أُلغي الحظر" : "Unblocked" }); loadAll(); }
+  };
+
+  const deleteUser = async (uid: string) => {
+    if (!confirm(isAr ? "حذف هذا المستخدم نهائياً؟" : "Permanently delete this user?")) return;
+    const { error } = await supabase.functions.invoke("admin-delete-user", { body: { user_id: uid } });
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: isAr ? "تم الحذف" : "Deleted" }); loadAll(); }
+  };
+
+  const createAdmin = async () => {
+    if (!newAdminEmail || !newAdminPassword) { toast({ title: "Error", description: "Email & password required", variant: "destructive" }); return; }
+    setCreatingAdmin(true);
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      body: { email: newAdminEmail, password: newAdminPassword, full_name: newAdminName, role: "admin" },
+    });
+    setCreatingAdmin(false);
+    if (error || (data as any)?.error) { toast({ title: "Error", description: (data as any)?.error || error?.message, variant: "destructive" }); return; }
+    toast({ title: isAr ? "تم إنشاء الأدمن" : "Admin created" });
+    setCreateAdminOpen(false); setNewAdminEmail(""); setNewAdminPassword(""); setNewAdminName("");
+    loadAll();
   };
 
   const statCards = [
