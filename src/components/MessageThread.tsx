@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User, ShieldAlert, Handshake, FileSignature, CreditCard, CheckCircle2 } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, ShieldAlert, Handshake, FileSignature, CreditCard, CheckCircle2, XCircle } from "lucide-react";
 import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -46,6 +46,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const [proposing, setProposing] = useState(false);
   const [signing, setSigning] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const isAr = typeof document !== "undefined" && document.documentElement.lang === "ar";
 
@@ -144,6 +145,18 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       toast({ title: isAr ? "تم إنشاء الصفقة" : "Deal created", description: isAr ? "بوابة الدفع غير مهيأة بالكامل" : "Payment iframe not configured" });
     }
     await refreshDeal();
+  };
+
+  const handleCancelDeal = async () => {
+    if (!activeDeal) return;
+    if (activeDeal.payment_status === "paid") return;
+    if (!confirm(isAr ? "هل أنت متأكد من إلغاء الصفقة؟" : "Cancel this deal?")) return;
+    setCancelling(true);
+    const { error } = await supabase.from("deals").update({ status: "cancelled" as any, payment_status: "cancelled" }).eq("id", activeDeal.id);
+    setCancelling(false);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: isAr ? "تم إلغاء الصفقة" : "Deal cancelled" });
+    setActiveDeal(null);
   };
 
   useEffect(() => {
@@ -270,6 +283,12 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
                 <Button size="sm" onClick={handlePay} disabled={paying} className="gradient-primary border-0 text-primary-foreground">
                   {paying ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <CreditCard className="h-3 w-3 me-1" />}
                   {isAr ? "ادفع الآن" : "Pay now"}
+                </Button>
+              )}
+              {activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && (
+                <Button size="sm" variant="outline" onClick={handleCancelDeal} disabled={cancelling} className="text-destructive">
+                  {cancelling ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <XCircle className="h-3 w-3 me-1" />}
+                  {isAr ? "إلغاء" : "Cancel"}
                 </Button>
               )}
             </div>
