@@ -25,6 +25,8 @@ import KycVerification from "@/pages/KycVerification";
 import MyDeals from "@/pages/MyDeals";
 import Admin from "@/pages/Admin";
 import VerifyPhone from "@/pages/VerifyPhone";
+import Payment from "@/pages/Payment";
+import PaymentResult from "@/pages/PaymentResult";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 
@@ -51,6 +53,8 @@ function AnimatedRoutes() {
         <Route path="/verify-phone" element={<PageTransition><VerifyPhone /></PageTransition>} />
         <Route path="/deals" element={<PageTransition><MyDeals /></PageTransition>} />
         <Route path="/admin" element={<PageTransition><Admin /></PageTransition>} />
+        <Route path="/payment/:dealId" element={<PageTransition><Payment /></PageTransition>} />
+        <Route path="/payment-result" element={<PageTransition><PaymentResult /></PageTransition>} />
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>
     </AnimatePresence>

@@ -138,9 +138,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       return;
     }
     const url = (data as any)?.iframe_url;
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      toast({ title: isAr ? "تم فتح بوابة الدفع" : "Payment opened", description: isAr ? "أكمل الدفع في النافذة الجديدة" : "Complete the payment in the new tab" });
+    const dealId = (data as any)?.deal_id;
+    if (url && dealId) {
+      // Navigate within our app to a route that hosts the Paymob iframe — avoids
+      // cross-origin/blob issues from popping the raw Paymob URL in a new tab.
+      window.location.href = `/payment/${dealId}?iframe=${encodeURIComponent(url)}`;
     } else {
       toast({ title: isAr ? "تم إنشاء الصفقة" : "Deal created", description: isAr ? "بوابة الدفع غير مهيأة بالكامل" : "Payment iframe not configured" });
     }
