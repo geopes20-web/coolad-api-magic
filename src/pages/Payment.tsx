@@ -13,8 +13,12 @@ export default function Payment() {
   const [dealStatus, setDealStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (iframeUrl) setStatus("ready");
-    else setStatus("error");
+    // Whitelist: only allow the official Paymob iframe host.
+    if (iframeUrl && /^https:\/\/accept\.paymob\.com\//i.test(iframeUrl)) {
+      setStatus("ready");
+    } else {
+      setStatus("error");
+    }
   }, [iframeUrl]);
 
   // Poll deal payment status every 4s to detect webhook completion
