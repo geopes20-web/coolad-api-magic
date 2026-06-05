@@ -94,11 +94,25 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       equity_percentage: equity ? Number(equity) : null,
       valuation_usd: valuation ? Number(valuation) : null,
       contract_terms: terms || `Investment of $${amt} in "${idea.title}"`,
-      status: "draft" as any,
+      status: "pending" as any,
       payment_status: "pending",
     } as any);
     setProposing(false);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      const msg = (error as any)?.message || "";
+      const code = (error as any)?.code || "";
+      const isRls = code === "42501" || /permission|rls|forbidden|policy/i.test(msg);
+      toast({
+        title: isRls ? (isAr ? "صلاحيات غير كافية" : "Permission denied") : "Error",
+        description: isRls
+          ? (isAr
+              ? "فشلت العملية بسبب الصلاحيات، يرجى تسجيل الخروج وإعادة الدخول لتحديث جلسة العمل."
+              : "Action blocked by permissions. Please sign out and sign in again to refresh your session.")
+          : msg,
+        variant: "destructive",
+      });
+      return;
+    }
     setProposeOpen(false);
     setAmount(""); setEquity(""); setValuation(""); setTerms("");
     toast({ title: isAr ? "تم إرسال العرض" : "Proposal sent", description: isAr ? "بانتظار توقيع الطرف الآخر" : "Awaiting the other party's signature" });
@@ -152,6 +166,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleCancelDeal = async () => {
     if (!activeDeal) return;
     if (activeDeal.payment_status === "paid") return;
+    // Once both parties signed, payment flow is locked — no cancel/edit.
+    if (activeDeal.founder_signed_at && activeDeal.investor_signed_at) {
+      toast({ title: isAr ? "غير مسموح" : "Not allowed", description: isAr ? "تم توقيع العقد من الطرفين، لا يمكن الإلغاء." : "Both parties signed — cancellation is locked.", variant: "destructive" });
+      return;
+    }
     if (!confirm(isAr ? "هل أنت متأكد من إلغاء الصفقة؟" : "Cancel this deal?")) return;
     setCancelling(true);
     const { error } = await supabase.from("deals").update({ status: "cancelled" as any, payment_status: "cancelled" }).eq("id", activeDeal.id);
@@ -258,6 +277,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       {/* Active deal banner */}
       {activeDeal && (
         <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+          {(() => { return null; })()}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-xs">
               <div className="font-semibold text-foreground">
@@ -275,24 +295,37 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
               </div>
             </div>
             <div className="flex gap-2">
-              {((isFounder && !activeDeal.founder_signed_at) || (!isFounder && !activeDeal.investor_signed_at)) && (
+              {(() => {
+                const st = activeDeal.status;
+                const editable = st == null || st === "pending" || st === "draft" || st === "pending_founder" || st === "pending_investor";
+                const bothSigned = !!activeDeal.founder_signed_at && !!activeDeal.investor_signed_at;
+                const needsMySig = (isFounder && !activeDeal.founder_signed_at) || (!isFounder && !activeDeal.investor_signed_at);
+                const showSign = editable && needsMySig && !bothSigned && activeDeal.status !== "cancelled" && activeDeal.payment_status !== "paid";
+                const showPay = bothSigned && activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && !isFounder;
+                const showCancel = !bothSigned && activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && editable;
+                return (
+                  <>
+                    {showSign && (
                 <Button size="sm" onClick={handleSign} disabled={signing} className="gradient-primary border-0 text-primary-foreground">
                   {signing ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <FileSignature className="h-3 w-3 me-1" />}
                   {isAr ? "توقيع" : "Sign"}
                 </Button>
-              )}
-              {activeDeal.founder_signed_at && activeDeal.investor_signed_at && activeDeal.payment_status !== "paid" && !isFounder && (
+                    )}
+                    {showPay && (
                 <Button size="sm" onClick={handlePay} disabled={paying} className="gradient-primary border-0 text-primary-foreground">
                   {paying ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <CreditCard className="h-3 w-3 me-1" />}
                   {isAr ? "ادفع الآن" : "Pay now"}
                 </Button>
-              )}
-              {activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && (
+                    )}
+                    {showCancel && (
                 <Button size="sm" variant="outline" onClick={handleCancelDeal} disabled={cancelling} className="text-destructive">
                   {cancelling ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <XCircle className="h-3 w-3 me-1" />}
                   {isAr ? "إلغاء" : "Cancel"}
                 </Button>
-              )}
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
