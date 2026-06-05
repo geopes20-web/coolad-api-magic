@@ -84,18 +84,23 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const amt = Number(amount);
     if (!amt || amt <= 0) { toast({ title: isAr ? "أدخل المبلغ" : "Enter amount", variant: "destructive" }); return; }
     setProposing(true);
+    // Ensure we have a fresh session before insert (avoids stale-JWT RLS denials)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setProposing(false);
+      toast({ title: isAr ? "يجب تسجيل الدخول أولاً" : "Please sign in first", variant: "destructive" });
+      return;
+    }
     const { data: idea } = await supabase.from("ideas").select("founder_id, title").eq("id", ideaId).maybeSingle();
     if (!idea) { setProposing(false); return; }
     const founderId = idea.founder_id;
-    const investorId = founderId === user.id ? otherUserId : user.id;
+    const investorId = founderId === session.user.id ? otherUserId : session.user.id;
     const { error } = await supabase.from("deals").insert({
       idea_id: ideaId, founder_id: founderId, investor_id: investorId,
       investment_amount_usd: amt,
       equity_percentage: equity ? Number(equity) : null,
       valuation_usd: valuation ? Number(valuation) : null,
       contract_terms: terms || `Investment of $${amt} in "${idea.title}"`,
-      // deal_status enum: draft | pending_founder | pending_investor | negotiating | signed | completed | cancelled
-      // Start as "draft" — both parties still need to sign.
       status: "draft" as any,
       founder_signed_at: null,
       investor_signed_at: null,
@@ -103,16 +108,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     } as any);
     setProposing(false);
     if (error) {
-      const msg = (error as any)?.message || "";
-      const code = (error as any)?.code || "";
-      const isRls = code === "42501" || /permission|rls|forbidden|policy/i.test(msg);
+      const msg = (error as any)?.message || "Unknown error";
+      console.error("Deal insert error:", error);
       toast({
-        title: isRls ? (isAr ? "صلاحيات غير كافية" : "Permission denied") : "Error",
-        description: isRls
-          ? (isAr
-              ? "فشلت العملية بسبب الصلاحيات، يرجى تسجيل الخروج وإعادة الدخول لتحديث جلسة العمل."
-              : "Action blocked by permissions. Please sign out and sign in again to refresh your session.")
-          : msg,
+        title: isAr ? "خطأ في إنشاء العرض" : "Error creating proposal",
+        description: msg,
         variant: "destructive",
       });
       return;
