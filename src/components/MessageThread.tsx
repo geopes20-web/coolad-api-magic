@@ -94,7 +94,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       equity_percentage: equity ? Number(equity) : null,
       valuation_usd: valuation ? Number(valuation) : null,
       contract_terms: terms || `Investment of $${amt} in "${idea.title}"`,
-      status: "pending" as any,
+      // deal_status enum: draft | pending_founder | pending_investor | negotiating | signed | completed | cancelled
+      // Start as "draft" — both parties still need to sign.
+      status: "draft" as any,
+      founder_signed_at: null,
+      investor_signed_at: null,
       payment_status: "pending",
     } as any);
     setProposing(false);
@@ -297,7 +301,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
             <div className="flex gap-2">
               {(() => {
                 const st = activeDeal.status;
-                const editable = st == null || st === "pending" || st === "draft" || st === "pending_founder" || st === "pending_investor";
+                const editable = st == null || st === "draft" || st === "pending_founder" || st === "pending_investor" || st === "negotiating";
                 const bothSigned = !!activeDeal.founder_signed_at && !!activeDeal.investor_signed_at;
                 const needsMySig = (isFounder && !activeDeal.founder_signed_at) || (!isFounder && !activeDeal.investor_signed_at);
                 const showSign = editable && needsMySig && !bothSigned && activeDeal.status !== "cancelled" && activeDeal.payment_status !== "paid";
