@@ -94,11 +94,25 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       equity_percentage: equity ? Number(equity) : null,
       valuation_usd: valuation ? Number(valuation) : null,
       contract_terms: terms || `Investment of $${amt} in "${idea.title}"`,
-      status: "draft" as any,
+      status: "pending" as any,
       payment_status: "pending",
     } as any);
     setProposing(false);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      const msg = (error as any)?.message || "";
+      const code = (error as any)?.code || "";
+      const isRls = code === "42501" || /permission|rls|forbidden|policy/i.test(msg);
+      toast({
+        title: isRls ? (isAr ? "صلاحيات غير كافية" : "Permission denied") : "Error",
+        description: isRls
+          ? (isAr
+              ? "فشلت العملية بسبب الصلاحيات، يرجى تسجيل الخروج وإعادة الدخول لتحديث جلسة العمل."
+              : "Action blocked by permissions. Please sign out and sign in again to refresh your session.")
+          : msg,
+        variant: "destructive",
+      });
+      return;
+    }
     setProposeOpen(false);
     setAmount(""); setEquity(""); setValuation(""); setTerms("");
     toast({ title: isAr ? "تم إرسال العرض" : "Proposal sent", description: isAr ? "بانتظار توقيع الطرف الآخر" : "Awaiting the other party's signature" });
@@ -152,6 +166,11 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleCancelDeal = async () => {
     if (!activeDeal) return;
     if (activeDeal.payment_status === "paid") return;
+    // Once both parties signed, payment flow is locked — no cancel/edit.
+    if (activeDeal.founder_signed_at && activeDeal.investor_signed_at) {
+      toast({ title: isAr ? "غير مسموح" : "Not allowed", description: isAr ? "تم توقيع العقد من الطرفين، لا يمكن الإلغاء." : "Both parties signed — cancellation is locked.", variant: "destructive" });
+      return;
+    }
     if (!confirm(isAr ? "هل أنت متأكد من إلغاء الصفقة؟" : "Cancel this deal?")) return;
     setCancelling(true);
     const { error } = await supabase.from("deals").update({ status: "cancelled" as any, payment_status: "cancelled" }).eq("id", activeDeal.id);
