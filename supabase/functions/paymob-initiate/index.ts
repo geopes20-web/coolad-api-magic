@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       platform_fee_percentage: PLATFORM_FEE_PCT,
       platform_fee_amount: platformFee,
       payment_status: "pending",
-      escrow_status: "initiating",
+      escrow_status: "pending",  // ✅ تم التصحيح: "initiating" غير مقبولة في الـ constraint
       status: "pending_founder",
     }).select().single();
     if (dealErr) throw new Error(`Deal creation failed: ${dealErr.message}`);
