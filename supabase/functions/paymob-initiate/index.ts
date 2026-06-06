@@ -118,6 +118,8 @@ Deno.serve(async (req) => {
         currency: "EGP",
         integration_id: Number(INTEGRATION_ID),
         lock_order_when_paid: true,
+        use_redirection: true,
+        redirection_url: "https://4a523d4f-8caa-4688-a7a1-244727b89397.lovableproject.com/payment-result",
       }),
     });
     const keyJson = await keyRes.json();
