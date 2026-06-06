@@ -21,6 +21,22 @@ export default function Payment() {
     }
   }, [iframeUrl]);
 
+  // Listen for Paymob postMessage signals (redirection / completion)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.redirection_url) {
+        window.location.href = event.data.redirection_url;
+        return;
+      }
+      if (event.data?.type === "PAYMOB_RESPONSE" || event.origin?.includes("paymob")) {
+        const merchantOrderId = event.data?.merchant_order_id || dealId;
+        navigate(`/payment-result?merchant_order_id=${merchantOrderId}`);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [dealId, navigate]);
+
   // Poll deal payment status every 4s to detect webhook completion
   useEffect(() => {
     if (!dealId) return;
