@@ -27,6 +27,7 @@ import Admin from "@/pages/Admin";
 import VerifyPhone from "@/pages/VerifyPhone";
 import Payment from "@/pages/Payment";
 import PaymentResult from "@/pages/PaymentResult";
+import Contract from "@/pages/Contract";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 
@@ -55,6 +56,7 @@ function AnimatedRoutes() {
         <Route path="/admin" element={<PageTransition><Admin /></PageTransition>} />
         <Route path="/payment/:dealId" element={<PageTransition><Payment /></PageTransition>} />
         <Route path="/payment-result" element={<PageTransition><PaymentResult /></PageTransition>} />
+        <Route path="/contract/:dealId" element={<PageTransition><Contract /></PageTransition>} />
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>
     </AnimatePresence>
