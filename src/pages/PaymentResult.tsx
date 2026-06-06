@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function PaymentResult() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const orderId =
     params.get("merchant_order_id") ||
     params.get("order") ||
@@ -85,6 +86,9 @@ export default function PaymentResult() {
             </>
           )}
           <div className="flex gap-3 justify-center">
+            {success && deal?.id && (
+              <Button onClick={() => navigate(`/contract/${deal.id}`)}>عرض العقد</Button>
+            )}
             <Button asChild><Link to="/deals">My Deals</Link></Button>
             <Button asChild variant="outline"><Link to="/marketplace">Marketplace</Link></Button>
           </div>
