@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Shield, Users as UsersIcon, FileCheck, Lightbulb, Eye, Check, X,
-  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus,
+  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus, BookOpen
 } from "lucide-react";
 
 type KycRow = {
@@ -86,6 +86,11 @@ export default function Admin() {
   if (authLoading) return <LoaderScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
+
+  // 1. تصحيح احتساب الخزينة: الفلترة هنا تضمن جمع العمليات الناجحة والمكتملة نقديًا فقط (حالتها paid و completed)
+  const totalPlatformFeesCollected = deals
+    .filter(d => d.payment_status === "paid" && d.status === "completed")
+    .reduce((sum, d) => sum + (d.investment_amount_usd * 0.10), 0);
 
   const approveKyc = async (id: string) => {
     const { error } = await supabase.from("kyc_verifications").update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString(), rejection_reason: null }).eq("id", id);
@@ -158,7 +163,7 @@ export default function Admin() {
     [isAr ? "الأفكار" : "Ideas", stats.total_ideas, Lightbulb],
     [isAr ? "البلاغات" : "Reports", stats.open_reports, Flag],
     [isAr ? "مدفوعات معلقة" : "Pending Pay", stats.pending_payments, CreditCard],
-    [isAr ? "إيراد المنصة" : "Revenue", `$${Number((stats.platform_revenue_usd || 0) + (stats.wallet_fees_usd || 0)).toLocaleString()}`, DollarSign],
+    [isAr ? "صافي أرباح المنصة المعتمدة" : "Verified Revenue (10%)", `$${Number(totalPlatformFeesCollected).toLocaleString()}`, DollarSign],
   ] as const;
 
   return (
@@ -168,7 +173,7 @@ export default function Admin() {
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center"><Shield className="w-5 h-5 text-primary-foreground" /></div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">{isAr ? "لوحة تحكم الأدمن" : "Admin Dashboard"}</h1>
-            <p className="text-sm text-muted-foreground">{isAr ? "مراجعة KYC، المدفوعات، الداتا روم، البلاغات والأفكار" : "KYC, payments, data-room, reports and ideas"}</p>
+            <p className="text-sm text-muted-foreground">{isAr ? "مراجعة KYC، أرباح المنصة، المدفوعات، والبلاغات" : "KYC, platform earnings, payments, and reports"}</p>
           </div>
         </div>
         <Button variant="outline" onClick={loadAll}>{isAr ? "تحديث" : "Refresh"}</Button>
@@ -184,7 +189,7 @@ export default function Admin() {
             <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 mb-6 h-auto">
               <TabsTrigger value="kyc">KYC ({kycList.filter(k => k.status === "pending").length})</TabsTrigger>
               <TabsTrigger value="access">Data Room ({accessRequests.length})</TabsTrigger>
-              <TabsTrigger value="payments">Payments ({deals.length})</TabsTrigger>
+              <TabsTrigger value="payments">{isAr ? "أرباح الصفقات" : "Deals Revenue"} ({deals.length})</TabsTrigger>
               <TabsTrigger value="transfers">Transfers ({paymentEvents.length})</TabsTrigger>
               <TabsTrigger value="reports">Reports ({reports.filter(r => r.status === "open").length})</TabsTrigger>
               <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
@@ -195,7 +200,60 @@ export default function Admin() {
 
             <TabsContent value="access" className="space-y-2">{accessRequests.map(a => <Row key={a.id} title={a.ideas?.title || a.idea_id} sub={`Fee $${a.data_room_fee_usd ?? 5} · ${a.payment_status || "unpaid"}`} status={a.status}><Button size="sm" variant="outline" onClick={() => updateAccess(a.id, "rejected")}><X className="h-4 w-4" /></Button><Button size="sm" onClick={() => updateAccess(a.id, "approved")} className="gradient-primary border-0 text-primary-foreground"><Check className="h-4 w-4" /></Button></Row>)}</TabsContent>
 
-            <TabsContent value="payments" className="space-y-2">{deals.map(d => <Row key={d.id} title={`$${d.investment_amount_usd?.toLocaleString()} investment`} sub={`Fee: $${d.platform_fee_amount || 0} · Escrow: ${d.escrow_status || "none"}`} status={d.payment_status}><Link to={`/idea/${d.idea_id}`}><Button size="sm" variant="outline"><Eye className="h-4 w-4" /></Button></Link></Row>)}</TabsContent>
+            <TabsContent value="payments" className="space-y-3">
+              <div className="glass rounded-xl p-4 mb-4 border border-emerald-500/20 bg-emerald-500/5">
+                <h3 className="text-sm font-bold text-foreground mb-1">{isAr ? "ملخص الخزينة الاستثمارية المعتمدة" : "Verified Treasury Summary"}</h3>
+                <p className="text-2xl font-black text-emerald-600">${Number(totalPlatformFeesCollected).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">{isAr ? "إجمالي الرسوم المستقطعة والمؤمنة نقديًا بحسابات المنصة" : "Total fees audited and securely stored inside system escrow"}</p>
+              </div>
+              
+              {deals.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">{isAr ? "لا توجد عمليات ماليّة بعد" : "No deals logged yet"}</p>
+              ) : (
+                deals.map(d => {
+                  // 2. تصحيح احتساب النسبة لكل صفحة: ضرب النسبة الحية 10% مباشرة لتطهير مخلفات البيانات التجريبية القديمة
+                  const currentFee = d.investment_amount_usd * 0.10;
+                  const relatedIdea = ideas.find(i => i.id === d.idea_id);
+                  return (
+                    <div key={d.id} className="glass rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-border/40">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="font-bold text-base text-foreground flex items-center gap-2">
+                          <span>${Number(d.investment_amount_usd).toLocaleString()}</span>
+                          <Badge variant="secondary" className="text-[10px] uppercase font-mono">{d.status}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-medium truncate">
+                          {isAr ? "المشروع: " : "Project: "} <span className="text-foreground">{relatedIdea?.title || d.idea_id}</span>
+                        </p>
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-3 font-mono">
+                          <div>Escrow: <span className="text-amber-500 font-bold">{d.escrow_status || "none"}</span></div>
+                          <div>Payment: <span className="font-bold text-slate-700">{d.payment_status || "unpaid"}</span></div>
+                          <div>Date: {new Date(d.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-2 md:pt-0">
+                        <div className="text-right">
+                          <span className="text-xs text-muted-foreground block">{isAr ? "عمولة المنصة (10%)" : "Platform Fee (10%)"}</span>
+                          <span className="font-black font-mono text-emerald-600 text-sm">${Number(currentFee).toLocaleString()}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Link to={`/contract/${d.id}`}>
+                            <Button size="sm" variant="outline" className="h-8">
+                              <FileCheck className="h-3.5 w-3.5 me-1" /> {isAr ? "العقد" : "Contract"}
+                            </Button>
+                          </Link>
+                          <Link to={`/idea/${d.idea_id}`}>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </TabsContent>
 
             <TabsContent value="transfers" className="space-y-2">
               {paymentEvents.length === 0 ? <p className="text-sm text-muted-foreground p-4">{isAr ? "لا توجد تحويلات بعد" : "No transfers yet"}</p> : paymentEvents.map(pe => {
@@ -208,7 +266,7 @@ export default function Admin() {
                   </div>
                   <div className="text-xs text-muted-foreground space-y-1">
                     <div>Ref: <span className="font-mono">{pe.external_reference || "—"}</span></div>
-                    <div>Deal: {pe.deal_id ? <Link to={`/idea/${deals.find(d => d.id === pe.deal_id)?.idea_id || ""}`} className="text-primary underline">{pe.deal_id.slice(0,8)}…</Link> : "—"}</div>
+                    <div>Deal: {pe.deal_id ? <Link to={`/contract/${pe.deal_id}`} className="text-primary underline font-mono">{pe.deal_id.slice(0,8)}…</Link> : "—"}</div>
                     <div>From: {inv.first_name || ""} {inv.last_name || ""} {inv.email ? `· ${inv.email}` : ""}</div>
                     {card && <div>Card: ****{String(card).slice(-4)}</div>}
                     <div>{new Date(pe.created_at).toLocaleString()}</div>

@@ -1,81 +1,59 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { Loader2, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 export default function Payment() {
   const { dealId } = useParams<{ dealId: string }>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const isAr = language === "ar";
   const iframeUrl = params.get("iframe");
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [dealStatus, setDealStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "redirecting" | "error">("loading");
 
   useEffect(() => {
-    // Whitelist: only allow the official Paymob iframe host.
-    if (iframeUrl && /^https:\/\/accept\.paymob\.com\//i.test(iframeUrl)) {
-      setStatus("ready");
-    } else {
+    if (!iframeUrl) {
       setStatus("error");
+      return;
     }
-  }, [iframeUrl]);
 
-  // Listen for Paymob postMessage signals (redirection / completion)
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.redirection_url) {
-        window.location.href = event.data.redirection_url;
-        return;
-      }
-      if (event.data?.type === "PAYMOB_RESPONSE" || event.origin?.includes("paymob")) {
-        const merchantOrderId = event.data?.merchant_order_id || dealId;
-        navigate(`/payment-result?merchant_order_id=${merchantOrderId}`);
-      }
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [dealId, navigate]);
+    if (!/^https:\/\/accept\.paymob\.com\//i.test(iframeUrl)) {
+      setStatus("error");
+      return;
+    }
 
-  // Poll deal payment status every 4s to detect webhook completion
-  useEffect(() => {
-    if (!dealId) return;
-    const i = setInterval(async () => {
-      const { data } = await supabase.from("deals").select("payment_status").eq("id", dealId).maybeSingle();
-      if (data?.payment_status) setDealStatus(data.payment_status);
-      if (data?.payment_status === "paid" || data?.payment_status === "failed") clearInterval(i);
-    }, 4000);
-    return () => clearInterval(i);
-  }, [dealId]);
+    if (dealId) {
+      sessionStorage.setItem("paymob_deal_id", dealId);
+    }
+
+    setStatus("redirecting");
+    window.location.href = iframeUrl;
+
+  }, [iframeUrl, dealId]);
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
-        {dealStatus === "paid" && (
-          <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="h-5 w-5" /> Payment confirmed</div>
-        )}
-        {dealStatus === "failed" && (
-          <div className="flex items-center gap-2 text-destructive"><XCircle className="h-5 w-5" /> Payment failed</div>
-        )}
-      </div>
-
-      <div className="glass rounded-2xl shadow-glass overflow-hidden bg-background" style={{ height: "calc(100vh - 160px)" }}>
-        {status === "loading" && (
-          <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        )}
-        {status === "error" && (
-          <div className="h-full flex items-center justify-center text-destructive">Missing iframe URL.</div>
-        )}
-        {status === "ready" && iframeUrl && (
-          <iframe
-            src={iframeUrl}
-            title="Paymob"
-            className="w-full h-full border-0"
-            allow="payment *; clipboard-write"
-          />
-        )}
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4" dir={isAr ? "rtl" : "ltr"}>
+      {status === "error" ? (
+        <div className="text-destructive text-center">
+          <p className="text-lg font-semibold mb-2">
+            {isAr ? "خطأ في رابط الدفع" : "Invalid payment link"}
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-sm underline text-muted-foreground"
+          >
+            {isAr ? "رجوع" : "Go back"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">
+            {isAr ? "جاري التحويل لصفحة الدفع الآمنة..." : "Redirecting to secure payment page..."}
+          </p>
+        </>
+      )}
     </div>
   );
 }

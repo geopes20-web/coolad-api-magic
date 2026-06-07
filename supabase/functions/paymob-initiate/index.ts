@@ -1,6 +1,3 @@
-// Paymob Initiate Payment (Hold = pre-auth, Capture later via separate call)
-// Creates: order -> payment_key -> returns iframe URL with hosted checkout
-// Computes 15% platform fee server-side and stores it on the deal.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -41,7 +38,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Look up the idea + founder
     const { data: idea } = await supabase.from("ideas").select("id, founder_id, title").eq("id", idea_id).maybeSingle();
     if (!idea) {
       return new Response(JSON.stringify({ error: "Idea not found" }), {
@@ -49,11 +45,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 15% platform fee
     const platformFee = +(amount_usd * PLATFORM_FEE_PCT / 100).toFixed(2);
-    // EGP conversion (rough; Paymob uses EGP cents)
     const fxRate = 50;
     const totalEGPCents = Math.round(amount_usd * fxRate * 100);
+
+    // ✅ Dynamic redirection URL based on request origin
+    const origin = req.headers.get("origin") || "https://coolad-api-magic.lovable.app";
+    const redirectionUrl = `${origin}/payment-result`;
 
     // 1. Auth token
     const authRes = await fetch(`${PAYMOB_BASE}/auth/tokens`, {
@@ -64,7 +62,7 @@ Deno.serve(async (req) => {
     if (!authRes.ok) throw new Error(`Paymob auth failed: ${JSON.stringify(authJson)}`);
     const token = authJson.token;
 
-    // 2. Create the deal record FIRST so we have a stable merchant_order_id
+    // 2. Create deal
     const { data: deal, error: dealErr } = await supabase.from("deals").insert({
       idea_id,
       investor_id: ud.user.id,
@@ -76,7 +74,7 @@ Deno.serve(async (req) => {
       platform_fee_percentage: PLATFORM_FEE_PCT,
       platform_fee_amount: platformFee,
       payment_status: "pending",
-      escrow_status: "none",  // allowed: none|held|captured|refunded|failed
+      escrow_status: "none",
       status: "pending_founder",
     }).select().single();
     if (dealErr) throw new Error(`Deal creation failed: ${dealErr.message}`);
@@ -119,7 +117,7 @@ Deno.serve(async (req) => {
         integration_id: Number(INTEGRATION_ID),
         lock_order_when_paid: true,
         use_redirection: true,
-        redirection_url: "https://4a523d4f-8caa-4688-a7a1-244727b89397.lovableproject.com/payment-result",
+        redirection_url: redirectionUrl,
       }),
     });
     const keyJson = await keyRes.json();
@@ -139,6 +137,7 @@ Deno.serve(async (req) => {
       amount_usd, platform_fee_usd: platformFee,
       net_to_founder_usd: +(amount_usd - platformFee).toFixed(2),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (e) {
     console.error("paymob-initiate error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
