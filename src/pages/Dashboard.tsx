@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import {
   Loader2, Rocket, DollarSign, Compass, Lightbulb, TrendingUp,
   MessageSquare, Bookmark, ArrowRight, Plus, Sparkles, BarChart3,
-  CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw,
+  CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw, Pencil, Trash2,
 } from "lucide-react";
 
 interface IdeaRow {
@@ -184,13 +184,26 @@ export default function Dashboard() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <div className="text-end">
                           <div className="flex items-center gap-1 text-sm">
                             <TrendingUp className="h-3.5 w-3.5 text-primary" />
                             <span className="font-semibold text-foreground">{idea.ai_score}</span>
                           </div>
                         </div>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit"
+                          onClick={() => navigate(`/submit?edit=${idea.id}`)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Delete"
+                          onClick={async () => {
+                            if (!confirm("Delete this idea? This cannot be undone.")) return;
+                            const { error } = await supabase.from("ideas").delete().eq("id", idea.id);
+                            if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+                            else setMyIdeas(prev => prev.filter(i => i.id !== idea.id));
+                          }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </motion.div>

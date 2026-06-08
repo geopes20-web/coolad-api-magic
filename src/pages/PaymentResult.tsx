@@ -79,6 +79,14 @@ export default function PaymentResult() {
   const success = deal?.payment_status === "paid";
   const failed = deal?.payment_status === "failed";
 
+  // Auto-redirect to the signed contract once payment is confirmed paid.
+  useEffect(() => {
+    if (success && deal?.id) {
+      const t = setTimeout(() => navigate(`/contract/${deal.id}`), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [success, deal?.id, navigate]);
+
   return (
     <div className="container mx-auto px-4 py-12 max-w-xl text-center" dir={isAr ? "rtl" : "ltr"}>
       {loading ? (

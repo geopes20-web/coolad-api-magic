@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,6 +84,8 @@ export default function SubmitIdea() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const [isLoading, setIsLoading] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -98,7 +100,54 @@ export default function SubmitIdea() {
     competitiveAdvantage: "", targetAudience: "", timeline: "", additionalInfo: "",
   });
 
+  // Storage key isolates "new draft" from per-idea edit drafts so we never
+  // overwrite a different project's saved data.
+  const storageKey = `idevest:submit-draft:${user?.id || "anon"}:${editId || "new"}`;
+
   const set = (key: keyof ProjectData, val: string) => setForm(p => ({ ...p, [key]: val }));
+
+  // Load draft from localStorage, OR existing idea fields when editing.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      if (editId) {
+        const { data } = await supabase.from("ideas").select("*").eq("id", editId).maybeSingle();
+        if (data && (data as any).founder_id === user.id) {
+          setForm({
+            name: (data as any).title || "",
+            description: (data as any).description || "",
+            sector: (data as any).sector || "",
+            location: (data as any).location || "",
+            capital: (data as any).capital_required || "",
+            expectedRevenue: (data as any).expected_revenue || "",
+            teamSize: (data as any).team_size || "",
+            teamExperience: (data as any).team_experience || "",
+            competitors: (data as any).competitors || "",
+            competitiveAdvantage: (data as any).competitive_advantage || "",
+            targetAudience: (data as any).target_audience || "",
+            timeline: (data as any).timeline || "",
+            additionalInfo: (data as any).additional_info || "",
+          });
+          return;
+        }
+      }
+      try {
+        const cached = localStorage.getItem(storageKey);
+        if (cached) setForm(JSON.parse(cached));
+      } catch {/* ignore */}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, editId]);
+
+  // Live autosave: every keystroke persists. Empties wipe the cache.
+  useEffect(() => {
+    if (!user) return;
+    const allEmpty = Object.values(form).every(v => !v || !v.trim());
+    try {
+      if (allEmpty) localStorage.removeItem(storageKey);
+      else localStorage.setItem(storageKey, JSON.stringify(form));
+    } catch {/* ignore */}
+  }, [form, storageKey, user]);
 
   const fields: { key: keyof ProjectData; label: string; ph: string; icon: typeof Building2; textarea?: boolean }[] = [
     { key: "name", label: t.submit.name, ph: t.submit.namePh, icon: Building2 },
@@ -176,14 +225,27 @@ export default function SubmitIdea() {
           const scores = parseScoresFromEvaluation(fullResult);
           setParsedScores(scores);
 
+          // Document-only fallback: if user uploaded a doc but left fields empty,
+          // derive sensible defaults from the AI evaluation so the marketplace
+          // card and detail tabs are never blank.
+          const titleMatch = fullResult.match(/(?:project\s*name|title)[:\-]\s*([^\n]{3,80})/i);
+          const sectorMatch = fullResult.match(/sector[:\-]\s*([^\n]{2,40})/i);
+          const capitalMatch = fullResult.match(/(?:capital|funding)[^\n]*?\$([\d,]+)/i);
+          const fallbackTitle = form.name || titleMatch?.[1]?.trim() || (documentFile ? documentFile.name.replace(/\.[^.]+$/, "") : "Untitled Project");
+          const fallbackDesc = form.description || fullResult.split("\n").find(l => l.trim().length > 60)?.slice(0, 800) || "Description extracted from uploaded document.";
+          const fallbackSector = form.sector || sectorMatch?.[1]?.trim() || "General";
+          const fallbackCapital = form.capital || (capitalMatch?.[1] ? `$${capitalMatch[1]}` : "TBD");
+
+          // Publish immediately when the AI accepts it; otherwise keep as draft
+          // so the founder can iterate (no admin approval required).
           const status = scores.decision === "accepted" ? "published" : "draft";
 
-          const { error } = await supabase.from("ideas").insert({
-            title: form.name,
-            description: form.description,
-            sector: form.sector,
+          const payload: any = {
+            title: fallbackTitle,
+            description: fallbackDesc,
+            sector: fallbackSector,
             location: form.location,
-            capital_required: form.capital,
+            capital_required: fallbackCapital,
             expected_revenue: form.expectedRevenue,
             team_size: form.teamSize,
             team_experience: form.teamExperience,
@@ -204,14 +266,30 @@ export default function SubmitIdea() {
             ai_recommendations: scores.recommendations,
             status,
             ai_evaluation: fullResult,
-            evaluation_version: 1,
-            score_history: JSON.stringify([{ version: 1, score: scores.overall, date: new Date().toISOString() }]),
-          } as any);
+          };
+
+          let error;
+          if (editId) {
+            // Edit-mode: UPDATE, bump evaluation_version
+            const { data: prev } = await supabase.from("ideas").select("evaluation_version, score_history").eq("id", editId).maybeSingle();
+            const newVersion = ((prev as any)?.evaluation_version || 1) + 1;
+            const prevHistory = (() => {
+              try { return JSON.parse((prev as any)?.score_history || "[]"); } catch { return []; }
+            })();
+            payload.evaluation_version = newVersion;
+            payload.score_history = JSON.stringify([...prevHistory, { version: newVersion, score: scores.overall, date: new Date().toISOString() }]);
+            ({ error } = await supabase.from("ideas").update(payload).eq("id", editId));
+          } else {
+            payload.evaluation_version = 1;
+            payload.score_history = JSON.stringify([{ version: 1, score: scores.overall, date: new Date().toISOString() }]);
+            ({ error } = await supabase.from("ideas").insert(payload));
+          }
 
           setIsLoading(false);
           if (error) {
             toast({ title: t.common.error, description: error.message, variant: "destructive" });
           } else {
+            try { localStorage.removeItem(storageKey); } catch {/* ignore */}
             toast({ title: t.submit.successTitle, description: t.submit.successDesc });
           }
         },
@@ -226,7 +304,9 @@ export default function SubmitIdea() {
     }
   };
 
-  const isValid = form.name && form.description && form.sector && form.capital;
+  // Flexible validation: either all 4 core text fields, OR a document upload.
+  const hasCoreFields = !!(form.name && form.description && form.sector && form.capital);
+  const isValid = hasCoreFields || !!documentFile;
 
   if (showResult) {
     return (
