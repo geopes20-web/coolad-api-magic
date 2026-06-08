@@ -187,11 +187,13 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("messages")
         .select("*")
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
-        .order("created_at", { ascending: true });
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`);
+      // Scope strictly by idea: each idea has its own isolated thread.
+      if (ideaId) q = q.eq("idea_id", ideaId); else q = q.is("idea_id", null);
+      const { data } = await q.order("created_at", { ascending: true });
       setMessages((data as Message[]) || []);
       setLoading(false);
 
@@ -202,13 +204,15 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     load();
 
     // Realtime subscription
-    const channel = supabase.channel(`msgs-${user.id}-${otherUserId}`)
+    const channel = supabase.channel(`msgs-${user.id}-${otherUserId}-${ideaId || "none"}`)
       .on("postgres_changes", {
         event: "INSERT", schema: "public", table: "messages",
       }, (payload) => {
         const msg = payload.new as Message;
-        if ((msg.sender_id === user.id && msg.receiver_id === otherUserId) ||
-            (msg.sender_id === otherUserId && msg.receiver_id === user.id)) {
+        const partyMatch = (msg.sender_id === user.id && msg.receiver_id === otherUserId) ||
+            (msg.sender_id === otherUserId && msg.receiver_id === user.id);
+        const ideaMatch = ideaId ? (msg as any).idea_id === ideaId : !(msg as any).idea_id;
+        if (partyMatch && ideaMatch) {
           setMessages(prev => [...prev, msg]);
           if (msg.sender_id === otherUserId) {
             supabase.from("messages").update({ read: true }).eq("id", msg.id);
@@ -217,7 +221,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user, otherUserId]);
+  }, [user, otherUserId, ideaId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

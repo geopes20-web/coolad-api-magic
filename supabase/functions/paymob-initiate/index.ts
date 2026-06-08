@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const PAYMOB_BASE = "https://accept.paymob.com/api";
-const PLATFORM_FEE_PCT = 15;
+const PLATFORM_FEE_PCT = 10;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
