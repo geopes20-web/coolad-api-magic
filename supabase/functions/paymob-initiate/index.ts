@@ -31,8 +31,10 @@ Deno.serve(async (req) => {
     const { data: ud } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (!ud.user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: corsHeaders });
 
-    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms } = await req.json();
-    if (!idea_id || !amount_usd || amount_usd <= 0) {
+    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, payment_type } = await req.json();
+    const isDataRoom = payment_type === "data_room_fee";
+    const effectiveAmountUsd = isDataRoom ? 5.0 : amount_usd;
+    if (!idea_id || !effectiveAmountUsd || effectiveAmountUsd <= 0) {
       return new Response(JSON.stringify({ error: "Missing fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -45,9 +47,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const platformFee = +(amount_usd * PLATFORM_FEE_PCT / 100).toFixed(2);
+    const platformFee = isDataRoom ? 0 : +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
     const fxRate = 50;
-    const totalEGPCents = Math.round(amount_usd * fxRate * 100);
+    const totalEGPCents = Math.round(effectiveAmountUsd * fxRate * 100);
 
     // ✅ Dynamic redirection URL based on request origin
     const origin = req.headers.get("origin") || "https://coolad-api-magic.lovable.app";
@@ -62,22 +64,30 @@ Deno.serve(async (req) => {
     if (!authRes.ok) throw new Error(`Paymob auth failed: ${JSON.stringify(authJson)}`);
     const token = authJson.token;
 
-    // 2. Create deal
-    const { data: deal, error: dealErr } = await supabase.from("deals").insert({
+    // 2. Create deal (skipped for one-off Data Room fee)
+    let merchantOrderId: string;
+    let dealId: string | null = null;
+    if (isDataRoom) {
+      merchantOrderId = `DR_${idea_id}_${ud.user.id}_${Date.now()}`;
+    } else {
+      const { data: deal, error: dealErr } = await supabase.from("deals").insert({
       idea_id,
       investor_id: ud.user.id,
       founder_id: idea.founder_id,
-      investment_amount_usd: amount_usd,
+        investment_amount_usd: effectiveAmountUsd,
       equity_percentage: equity_percentage || null,
       valuation_usd: valuation_usd || null,
-      contract_terms: contract_terms || `Investment of $${amount_usd} in ${idea.title}`,
+        contract_terms: contract_terms || `Investment of $${effectiveAmountUsd} in ${idea.title}`,
       platform_fee_percentage: PLATFORM_FEE_PCT,
       platform_fee_amount: platformFee,
       payment_status: "pending",
       escrow_status: "none",
       status: "pending_founder",
-    }).select().single();
-    if (dealErr) throw new Error(`Deal creation failed: ${dealErr.message}`);
+      }).select().single();
+      if (dealErr) throw new Error(`Deal creation failed: ${dealErr.message}`);
+      dealId = deal.id;
+      merchantOrderId = deal.id;
+    }
 
     // 3. Order
     const orderRes = await fetch(`${PAYMOB_BASE}/ecommerce/orders`, {
@@ -87,8 +97,8 @@ Deno.serve(async (req) => {
         delivery_needed: false,
         amount_cents: totalEGPCents,
         currency: "EGP",
-        merchant_order_id: deal.id,
-        items: [{ name: `Investment in ${idea.title}`.slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
+        merchant_order_id: merchantOrderId,
+        items: [{ name: (isDataRoom ? `Data Room: ${idea.title}` : `Investment in ${idea.title}`).slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
       }),
     });
     const orderJson = await orderRes.json();
@@ -130,12 +140,14 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       ok: true,
-      deal_id: deal.id,
+      deal_id: dealId,
+      merchant_order_id: merchantOrderId,
       payment_token: keyJson.token,
       iframe_url: iframeUrl,
       order_id: orderJson.id,
-      amount_usd, platform_fee_usd: platformFee,
-      net_to_founder_usd: +(amount_usd - platformFee).toFixed(2),
+      amount_usd: effectiveAmountUsd,
+      platform_fee_usd: platformFee,
+      net_to_founder_usd: +(effectiveAmountUsd - platformFee).toFixed(2),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e) {
