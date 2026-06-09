@@ -40,6 +40,7 @@ export default function IdeaDetail() {
   const [accessStatus, setAccessStatus] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [signedNda, setSignedNda] = useState(false);
+  const [hasDataRoomAccess, setHasDataRoomAccess] = useState(false);
 
   // دالة ذكية لتنظيف الأرقام ومنع ظهور الـ NaN في واجهتك الأصلية
   const cleanAndFormatNumber = (val: string | null | undefined, fallback = "0") => {
@@ -64,6 +65,15 @@ export default function IdeaDetail() {
       
       const { data: ndaData } = await supabase.from("nda_agreements").select("id").eq("investor_id", user.id).eq("idea_id", id).maybeSingle();
       setSignedNda(!!ndaData);
+
+      const { data: drData } = await (supabase as any)
+        .from("data_room_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("idea_id", id)
+        .eq("status", "approved")
+        .maybeSingle();
+      setHasDataRoomAccess(!!drData);
     }
   };
 
@@ -102,6 +112,7 @@ export default function IdeaDetail() {
         body: { 
           idea_id: idea.id, 
           amount_usd: 5.00, 
+          payment_type: "data_room_fee",
           contract_terms: `Secure Data Room Access Fee for project: ${idea.title}` 
         }
       });
@@ -109,7 +120,8 @@ export default function IdeaDetail() {
       
       const checkoutUrl = data?.iframe_url || data?.iframeUrl;
       if (checkoutUrl && !error) {
-        window.location.href = checkoutUrl;
+        // Use in-app Payment route (iframe) — avoids proxy errors from direct redirect.
+        navigate(`/payment/data-room?iframe=${encodeURIComponent(checkoutUrl)}`);
       } else {
         toast({ title: "Payment Error", description: error?.message || "Gateway configuration missing", variant: "destructive" });
       }
@@ -300,7 +312,7 @@ export default function IdeaDetail() {
 
         {/* حقل الداتا روم المؤمن كلياً بـ 5 دولار حقيقية من بايموب */}
         <TabsContent value="dataroom" className="p-6">
-          {!accessStatus && !isOwner ? (
+          {!hasDataRoomAccess && !isOwner && userRole !== "admin" ? (
             <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
               <FolderLock className="h-12 w-12 mx-auto text-amber-500" />
               <h3 className="text-lg font-bold tracking-tight">Secure Corporate Data Room Locked</h3>
