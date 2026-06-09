@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Sparkles, Loader2, Rocket, DollarSign, Compass, Phone } from "lucide-react";
+import { Sparkles, Loader2, Rocket, DollarSign, Compass, Phone, Eye, EyeOff, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
@@ -20,8 +20,21 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<Role>("explorer");
   const [loading, setLoading] = useState(false);
+  
+  // حالات التحكم في رؤية كلمة المرور
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // حالات فحص شروط كلمة المرور لحظة بلحظة
+  const [checks, setChecks] = useState({
+    hasUppercase: false,
+    hasSymbol: false,
+    hasNumber: false,
+    hasMinLength: false,
+  });
 
   const roles = [
     { value: "entrepreneur" as Role, label: t.auth.entrepreneur, desc: t.auth.entrepreneurDesc, icon: Rocket },
@@ -29,18 +42,48 @@ export default function Register() {
     { value: "explorer" as Role, label: t.auth.explorer, desc: t.auth.explorerDesc, icon: Compass },
   ];
 
+  // تتبع وفحص كلمة المرور لحظياً أثناء الكتابة لعمل الـ Checklist التفاعلية
+  useEffect(() => {
+    setChecks({
+      hasUppercase: /[A-Z]/.test(password),
+      hasSymbol: /[^A-Za-z0-9]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasMinLength: password.length >= 8,
+    });
+  }, [password]);
+
   const validatePhone = (p: string) => /^[\d+\s()-]{8,20}$/.test(p.trim());
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast({ title: t.common.error, description: isAr ? "كلمة المرور 6 أحرف على الأقل" : "Password must be at least 6 characters", variant: "destructive" });
+
+    // التحقق الشامل من تلبية كافة شروط كلمة المرور الأربعة قبل الإرسال
+    if (!checks.hasUppercase || !checks.hasSymbol || !checks.hasNumber || !checks.hasMinLength) {
+      toast({ 
+        title: t.common.error, 
+        description: isAr 
+          ? "يجب تلبية جميع شروط كلمة المرور أولاً." 
+          : "All password requirements must be met.", 
+        variant: "destructive" 
+      });
       return;
     }
+
+    // التحقق من تطابق كلمة المرور مع حقل التأكيد
+    if (password !== confirmPassword) {
+      toast({ 
+        title: t.common.error, 
+        description: isAr ? "كلمات المرور غير متطابقة" : "Passwords do not match", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!validatePhone(phone)) {
       toast({ title: t.common.error, description: isAr ? "رقم هاتف غير صالح" : "Invalid phone number", variant: "destructive" });
       return;
     }
+    
     setLoading(true);
 
     const { data, error } = await supabase.auth.signUp({
@@ -54,7 +97,6 @@ export default function Register() {
 
     if (error) {
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
-      setLoading(false);
       return;
     }
 
@@ -97,10 +139,12 @@ export default function Register() {
               <Label htmlFor="fullName">{t.auth.fullName}</Label>
               <Input id="fullName" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">{t.auth.email}</Label>
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-1">
                 <Phone className="h-3.5 w-3.5" />
@@ -108,9 +152,67 @@ export default function Register() {
               </Label>
               <Input id="phone" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+201234567890" />
             </div>
-            <div className="space-y-2">
+
+            {/* حقل كلمة المرور الأساسي مع دالة الإظهار والإخفاء التفاعلية */}
+            <div className="space-y-2 relative">
               <Label htmlFor="password">{t.auth.password}</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  required 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors h-5 w-5 flex items-center justify-center"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* لوحة تفاعلية لحظية (Checklist) تعرض متطلبات كلمة المرور الأربعة ونسبة تحققها باللون الأخضر أو الرمادي */}
+            <div className="p-3 bg-muted/20 border border-border/40 rounded-xl space-y-1.5 font-sans text-xs">
+              <div className={cn("flex items-center gap-1.5 transition-colors", checks.hasMinLength ? "text-emerald-500" : "text-muted-foreground")}>
+                {checks.hasMinLength ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                <span>{isAr ? "على الأقل 8 أحرف" : "At least 8 characters"}</span>
+              </div>
+              <div className={cn("flex items-center gap-1.5 transition-colors", checks.hasUppercase ? "text-emerald-500" : "text-muted-foreground")}>
+                {checks.hasUppercase ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                <span>{isAr ? "يحتوي على حرف كابيتل واحد على الأقل (A-Z)" : "At least one uppercase letter (A-Z)"}</span>
+              </div>
+              <div className={cn("flex items-center gap-1.5 transition-colors", checks.hasNumber ? "text-emerald-500" : "text-muted-foreground")}>
+                {checks.hasNumber ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                <span>{isAr ? "يحتوي على أرقام (0-9)" : "Contains numbers (0-9)"}</span>
+              </div>
+              <div className={cn("flex items-center gap-1.5 transition-colors", checks.hasSymbol ? "text-emerald-500" : "text-muted-foreground")}>
+                {checks.hasSymbol ? <Check className="h-3.5 w-3.5 shrink-0" /> : <X className="h-3.5 w-3.5 shrink-0" />}
+                <span>{isAr ? "يحتوي على رموز مخصصة (@,#,$,...)" : "Contains symbols (@,#,$,...)"}</span>
+              </div>
+            </div>
+
+            {/* حقل تأكيد كلمة المرور (Confirm Password) */}
+            <div className="space-y-2 relative">
+              <Label htmlFor="confirmPassword">{isAr ? "تأكيد كلمة المرور" : "Confirm Password"}</Label>
+              <div className="relative">
+                <Input 
+                  id="confirmPassword" 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  required 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors h-5 w-5 flex items-center justify-center"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">

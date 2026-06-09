@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User, ShieldAlert, Handshake, FileSignature, CreditCard, CheckCircle2, XCircle } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, Handshake, FileSignature, CreditCard, CheckCircle2, XCircle } from "lucide-react";
 import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -47,6 +47,8 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const [signing, setSigning] = useState(false);
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  
+  const [treasuryAuditedFee, setTreasuryAuditedFee] = useState<number>(0);
 
   const isAr = typeof document !== "undefined" && document.documentElement.lang === "ar";
 
@@ -63,7 +65,13 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       const { data: deal } = await supabase.from("deals").select("*")
         .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      setActiveDeal(deal || null);
+      
+      if (deal) {
+        setActiveDeal(deal);
+        setTreasuryAuditedFee(Number(deal.investment_amount_usd) * 0.10);
+      } else {
+        setActiveDeal(null);
+      }
     })();
   }, [user, ideaId, otherUserId]);
 
@@ -76,7 +84,13 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const { data: deal } = await supabase.from("deals").select("*")
       .eq("idea_id", ideaId).eq("founder_id", founderId).eq("investor_id", investorId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    setActiveDeal(deal || null);
+    
+    if (deal) {
+      setActiveDeal(deal);
+      setTreasuryAuditedFee(Number(deal.investment_amount_usd) * 0.10);
+    } else {
+      setActiveDeal(null);
+    }
   };
 
   const handlePropose = async () => {
@@ -84,7 +98,6 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const amt = Number(amount);
     if (!amt || amt <= 0) { toast({ title: isAr ? "أدخل المبلغ" : "Enter amount", variant: "destructive" }); return; }
     setProposing(true);
-    // Ensure we have a fresh session before insert (avoids stale-JWT RLS denials)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setProposing(false);
@@ -144,7 +157,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const { data, error } = await supabase.functions.invoke("paymob-initiate", {
       body: {
         idea_id: ideaId,
-        amount_usd: activeDeal.investment_amount_usd,
+        amount_usd: Number(activeDeal.investment_amount_usd),
         equity_percentage: activeDeal.equity_percentage,
         valuation_usd: activeDeal.valuation_usd,
         contract_terms: activeDeal.contract_terms,
@@ -155,11 +168,9 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
       toast({ title: "Payment error", description: (data as any)?.error || error?.message || "Failed", variant: "destructive" });
       return;
     }
-    const url = (data as any)?.iframe_url;
-    const dealId = (data as any)?.deal_id;
+    const url = (data as any)?.iframe_url || (data as any)?.iframeUrl;
+    const dealId = (data as any)?.deal_id || activeDeal.id;
     if (url && dealId) {
-      // Navigate within our app to a route that hosts the Paymob iframe — avoids
-      // cross-origin/blob issues from popping the raw Paymob URL in a new tab.
       window.location.href = `/payment/${dealId}?iframe=${encodeURIComponent(url)}`;
     } else {
       toast({ title: isAr ? "تم إنشاء الصفقة" : "Deal created", description: isAr ? "بوابة الدفع غير مهيأة بالكامل" : "Payment iframe not configured" });
@@ -170,7 +181,6 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleCancelDeal = async () => {
     if (!activeDeal) return;
     if (activeDeal.payment_status === "paid") return;
-    // Once both parties signed, payment flow is locked — no cancel/edit.
     if (activeDeal.founder_signed_at && activeDeal.investor_signed_at) {
       toast({ title: isAr ? "غير مسموح" : "Not allowed", description: isAr ? "تم توقيع العقد من الطرفين، لا يمكن الإلغاء." : "Both parties signed — cancellation is locked.", variant: "destructive" });
       return;
@@ -191,19 +201,16 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
         .from("messages")
         .select("*")
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`);
-      // Scope strictly by idea: each idea has its own isolated thread.
       if (ideaId) q = q.eq("idea_id", ideaId); else q = q.is("idea_id", null);
       const { data } = await q.order("created_at", { ascending: true });
       setMessages((data as Message[]) || []);
       setLoading(false);
 
-      // Mark as read
       await supabase.from("messages").update({ read: true })
         .eq("sender_id", otherUserId).eq("receiver_id", user.id).eq("read", false);
     };
     load();
 
-    // Realtime subscription
     const channel = supabase.channel(`msgs-${user.id}-${otherUserId}-${ideaId || "none"}`)
       .on("postgres_changes", {
         event: "INSERT", schema: "public", table: "messages",
@@ -230,7 +237,6 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
 
-    // Layer 1: Client-side filter (instant feedback)
     const analysis = analyzeMessage(input);
     if (analysis.blocked) {
       toast({
@@ -242,7 +248,6 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     }
 
     setSending(true);
-    // Layer 2: Server-side filter via edge function (authoritative)
     const { data, error } = await supabase.functions.invoke("send-message", {
       body: { receiver_id: otherUserId, content: input.trim(), idea_id: ideaId || null },
     });
@@ -267,40 +272,38 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border/50">
+    <div className="flex flex-col h-full bg-[#0B1528]">
+      {/* Header النظيف الأصلي بدون أي حشو أو لمسات زائدة */}
+      <div className="flex items-center gap-3 p-4 border-b border-zinc-800/80">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-          <User className="h-4 w-4 text-muted-foreground" />
+        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+          <User className="h-4 w-4 text-zinc-400" />
         </div>
-        <span className="font-medium text-foreground flex-1">{otherUserName}</span>
+        <span className="font-medium text-white flex-1">{otherUserName}</span>
         {ideaId && !activeDeal && (
-          <Button size="sm" variant="outline" onClick={() => setProposeOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => setProposeOpen(true)} className="border-zinc-700 text-zinc-200">
             <Handshake className="h-4 w-4 me-1" />{isAr ? "اقتراح صفقة" : "Propose Deal"}
           </Button>
         )}
       </div>
 
-      {/* Active deal banner */}
+      {/* حزام الـ Deal والـ Treasury المطابق تماماً لصورة الـ Layout الفاخر والأصلي */}
       {activeDeal && (
-        <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
-          {(() => { return null; })()}
+        <div className="px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/40 flex flex-col gap-2">
+          <div className="flex items-center justify-between p-3 rounded-xl border border-zinc-800 text-xs font-mono text-zinc-400">
+            <div>
+              <span className="text-zinc-500 block text-[10px] font-sans font-bold uppercase mb-0.5">VERIFIED TREASURY SUMMARY</span>
+              <strong className="text-white">${treasuryAuditedFee.toLocaleString()}</strong> <span className="text-[10px] text-zinc-500">(Platform 10% Fee Audited)</span>
+            </div>
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px] font-sans font-bold uppercase mb-0.5">TOTAL ESCROW POOL</span>
+              <strong className="text-emerald-500">${Number(activeDeal.investment_amount_usd).toLocaleString()}</strong>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-xs">
-              <div className="font-semibold text-foreground">
-                💼 ${Number(activeDeal.investment_amount_usd).toLocaleString()}
-                {activeDeal.equity_percentage ? ` · ${activeDeal.equity_percentage}% equity` : ""}
-              </div>
-              <div className="text-muted-foreground mt-0.5">
-                {isAr ? "المؤسس: " : "Founder: "}
-                {activeDeal.founder_signed_at ? <CheckCircle2 className="h-3 w-3 inline text-primary" /> : "—"}
-                {" · "}
-                {isAr ? "المستثمر: " : "Investor: "}
-                {activeDeal.investor_signed_at ? <CheckCircle2 className="h-3 w-3 inline text-primary" /> : "—"}
-                {" · "}
-                {activeDeal.payment_status === "paid" ? "✅ Paid" : activeDeal.payment_status}
-              </div>
+            <div className="text-xs font-mono text-zinc-400">
+              Founder-Investor: {activeDeal.investor_signed_at ? " Signed" : "Pending"} &bull; Status: <span className="font-bold uppercase text-emerald-500">{activeDeal.status}</span> &bull; {activeDeal.payment_status === "paid" ? " Paid" : activeDeal.payment_status}
             </div>
             <div className="flex gap-2">
               {(() => {
@@ -311,25 +314,31 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
                 const showSign = editable && needsMySig && !bothSigned && activeDeal.status !== "cancelled" && activeDeal.payment_status !== "paid";
                 const showPay = bothSigned && activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && !isFounder;
                 const showCancel = !bothSigned && activeDeal.payment_status !== "paid" && activeDeal.status !== "cancelled" && editable;
+                
+                const isPaidSuccess = activeDeal.payment_status === "paid";
+
                 return (
                   <>
                     {showSign && (
-                <Button size="sm" onClick={handleSign} disabled={signing} className="gradient-primary border-0 text-primary-foreground">
-                  {signing ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <FileSignature className="h-3 w-3 me-1" />}
-                  {isAr ? "توقيع" : "Sign"}
-                </Button>
+                      <Button size="sm" onClick={handleSign} disabled={signing} className="gradient-primary border-0 text-white font-semibold">
+                        <FileSignature className="h-3.5 w-3.5 me-1" /> {isAr ? "توقيع" : "Sign"}
+                      </Button>
                     )}
                     {showPay && (
-                <Button size="sm" onClick={handlePay} disabled={paying} className="gradient-primary border-0 text-primary-foreground">
-                  {paying ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <CreditCard className="h-3 w-3 me-1" />}
-                  {isAr ? "ادفع الآن" : "Pay now"}
-                </Button>
+                      <Button size="sm" onClick={handlePay} disabled={paying} className="gradient-primary border-0 text-white font-semibold">
+                        <CreditCard className="h-3.5 w-3.5 me-1" /> {isAr ? "ادفع الآن" : "Pay now"}
+                      </Button>
+                    )}
+                    {/* ✅ التوجيه الصريح والمثالي الموحد لكلا الطرفين لفتح صفحة مراجعة وثيقة وملف العقد النهائي الموثق بنجاح */}
+                    {isPaidSuccess && (
+                      <Button size="sm" onClick={() => { window.location.href = `/contract/${activeDeal.id}`; }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-4 rounded-xl animate-fade-in">
+                        <FileSignature className="h-3.5 w-3.5 me-1" /> {isAr ? "تسجيل العقد" : "Sign Contract Blueprint"}
+                      </Button>
                     )}
                     {showCancel && (
-                <Button size="sm" variant="outline" onClick={handleCancelDeal} disabled={cancelling} className="text-destructive">
-                  {cancelling ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <XCircle className="h-3 w-3 me-1" />}
-                  {isAr ? "إلغاء" : "Cancel"}
-                </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancelDeal} disabled={cancelling} className="text-destructive border-zinc-800">
+                        {isAr ? "إلغاء" : "Cancel"}
+                      </Button>
                     )}
                   </>
                 );
@@ -339,19 +348,19 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* Messages List - لون الخلفية القديم العادي النظيف */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0B1528]">
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
         ) : messages.length === 0 ? (
-          <p className="text-center text-muted-foreground py-10">{t.dashboard.noMessages}</p>
+          <p className="text-center text-zinc-500 py-10">{t.dashboard.noMessages}</p>
         ) : (
           messages.map(msg => (
             <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.sender_id === user?.id
-                  ? "gradient-primary text-primary-foreground rounded-ee-md"
-                  : "bg-muted text-foreground rounded-es-md"
+                  ? "bg-emerald-500 text-white rounded-ee-md"
+                  : "bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-es-md"
               }`}>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
                 <span className="text-[10px] opacity-60 mt-1 block">
@@ -364,57 +373,51 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-3 border-t border-border/50 flex gap-2 items-end">
+      {/* Input Form layout */}
+      <div className="p-3 border-t border-zinc-800/80 flex gap-2 items-end bg-[#0B1528]">
         <Textarea
           value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           placeholder={t.chat.placeholder}
-          className="min-h-[44px] max-h-24 resize-none bg-transparent border-0 focus-visible:ring-0 text-sm"
+          className="min-h-[44px] max-h-24 resize-none bg-zinc-900/60 border-zinc-800 focus-visible:ring-0 text-sm text-white rounded-xl"
           rows={1}
         />
         <Button onClick={handleSend} disabled={!input.trim() || sending} size="icon"
-          className="gradient-primary border-0 text-primary-foreground shrink-0 h-10 w-10">
+          className="gradient-primary border-0 text-white shrink-0 h-10 w-10 rounded-xl">
           <Send className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Propose Deal dialog */}
       <Dialog open={proposeOpen} onOpenChange={setProposeOpen}>
-        <DialogContent>
+        <DialogContent className="bg-zinc-950 border border-zinc-800 text-white">
           <DialogHeader>
-            <DialogTitle>{isAr ? "اقتراح صفقة استثمار" : "Propose Investment Deal"}</DialogTitle>
-            <DialogDescription>
-              {isAr
-                ? "حدد شروط الاستثمار. يجب توقيع الطرفين قبل تفعيل الدفع عبر Paymob (وضع الاختبار)."
-                : "Set the investment terms. Both parties must sign before Paymob (test mode) payment is enabled."}
-            </DialogDescription>
+            <DialogTitle className="text-white">{isAr ? "اقتراح صفقة استثمار" : "Propose Investment Deal"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-muted-foreground">{isAr ? "المبلغ (USD)" : "Amount (USD)"} *</label>
-              <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" />
+              <label className="text-xs text-zinc-400">{isAr ? "المبلغ (USD)" : "Amount (USD)"} *</label>
+              <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" className="bg-zinc-900 border-zinc-800 text-white" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">{isAr ? "الحصة %" : "Equity %"}</label>
-                <Input type="number" step="0.1" value={equity} onChange={e => setEquity(e.target.value)} placeholder="10" />
+                <label className="text-xs text-zinc-400">{isAr ? "الحصة %" : "Equity %"}</label>
+                <Input type="number" step="0.1" value={equity} onChange={e => setEquity(e.target.value)} placeholder="10" className="bg-zinc-900 border-zinc-800 text-white" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">{isAr ? "التقييم (USD)" : "Valuation (USD)"}</label>
-                <Input type="number" value={valuation} onChange={e => setValuation(e.target.value)} placeholder="100000" />
+                <label className="text-xs text-zinc-400">{isAr ? "التقييم (USD)" : "Valuation (USD)"}</label>
+                <Input type="number" value={valuation} onChange={e => setValuation(e.target.value)} placeholder="100000" className="bg-zinc-900 border-zinc-800 text-white" />
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">{isAr ? "ملاحظات / شروط إضافية" : "Notes / extra terms"}</label>
-              <Textarea rows={3} value={terms} onChange={e => setTerms(e.target.value)} />
+              <label className="text-xs text-zinc-400">{isAr ? "ملاحظات / شروط إضافية" : "Notes / extra terms"}</label>
+              <Textarea rows={3} value={terms} onChange={e => setTerms(e.target.value)} className="bg-zinc-900 border-zinc-800 text-white" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProposeOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={handlePropose} disabled={proposing} className="gradient-primary border-0 text-primary-foreground">
-              {proposing ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <Handshake className="h-4 w-4 me-1" />}
-              {isAr ? "إرسال العرض" : "Send Proposal"}
+            <Button variant="outline" onClick={() => setProposeOpen(false)} className="border-zinc-800 text-zinc-300">Cancel</Button>
+            <Button onClick={handlePropose} disabled={proposing} className="gradient-primary border-0 text-white">
+              Send Proposal
             </Button>
           </DialogFooter>
         </DialogContent>

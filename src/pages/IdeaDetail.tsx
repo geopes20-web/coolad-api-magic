@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle,
+  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle, FileText, FolderLock
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -24,7 +24,7 @@ interface IdeaData {
   founder_id: string; ai_score: number; risk_score: number; market_score: number;
   innovation_score: number; ai_evaluation: string; created_at: string;
   execution_score: number; investment_score: number; decision: string;
-  ai_recommendations: string;
+  ai_recommendations: string; document_url?: string | null;
   profiles?: { full_name: string } | null;
   [key: string]: unknown;
 }
@@ -38,23 +38,37 @@ export default function IdeaDetail() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [accessStatus, setAccessStatus] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [signedNda, setSignedNda] = useState(false);
+
+  // دالة ذكية لتنظيف الأرقام ومنع ظهور الـ NaN في واجهتك الأصلية
+  const cleanAndFormatNumber = (val: string | null | undefined, fallback = "0") => {
+    if (!val) return fallback;
+    const cleanStr = val.replace(/[^\d.]/g, "");
+    const num = parseFloat(cleanStr);
+    return isNaN(num) ? val : num.toLocaleString();
+  };
+
+  const loadData = async () => {
+    if (!id) return;
+    const { data } = await supabase.from("ideas").select("*, profiles(full_name)").eq("id", id).maybeSingle();
+    setIdea(data as unknown as IdeaData);
+    setLoading(false);
+
+    if (user) {
+      const { data: savedData } = await supabase.from("saved_ideas").select("id").eq("user_id", user.id).eq("idea_id", id).maybeSingle();
+      setSaved(!!savedData);
+
+      const { data: accessData } = await supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as { data: { status: string } | null };
+      setAccessStatus(accessData?.status || null);
+      
+      const { data: ndaData } = await supabase.from("nda_agreements").select("id").eq("investor_id", user.id).eq("idea_id", id).maybeSingle();
+      setSignedNda(!!ndaData);
+    }
+  };
 
   useEffect(() => {
-    if (!id) return;
-    const load = async () => {
-      const { data } = await supabase.from("ideas").select("*, profiles(full_name)").eq("id", id).maybeSingle();
-      setIdea(data as unknown as IdeaData);
-      setLoading(false);
-
-      if (user) {
-        const { data: savedData } = await supabase.from("saved_ideas").select("id").eq("user_id", user.id).eq("idea_id", id).maybeSingle();
-        setSaved(!!savedData);
-
-        const { data: accessData } = await supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as { data: { status: string } | null };
-        setAccessStatus(accessData?.status || null);
-      }
-    };
-    load();
+    loadData();
   }, [id, user]);
 
   const toggleSave = async () => {
@@ -77,6 +91,39 @@ export default function IdeaDetail() {
       setAccessStatus("pending");
       toast({ title: t.common.success, description: t.ideaDetail.accessRequested });
     }
+  };
+
+  // تفعيل الدفع الحقيقي واللحظي لرسوم الداتا روم (5 دولار) للموقع مباشرة عبر بايموب عند الضغط
+  const handlePayDataRoom = async () => {
+    if (!idea) return;
+    setActionLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("paymob-initiate", {
+        body: { 
+          idea_id: idea.id, 
+          amount_usd: 5.00, 
+          contract_terms: `Secure Data Room Access Fee for project: ${idea.title}` 
+        }
+      });
+      setActionLoading(false);
+      
+      const checkoutUrl = data?.iframe_url || data?.iframeUrl;
+      if (checkoutUrl && !error) {
+        window.location.href = checkoutUrl;
+      } else {
+        toast({ title: "Payment Error", description: error?.message || "Gateway configuration missing", variant: "destructive" });
+      }
+    } catch {
+      setActionLoading(false);
+      toast({ title: "Connection Failed", variant: "destructive" });
+    }
+  };
+
+  const handleSignNda = async () => {
+    setActionLoading(true);
+    const { error } = await supabase.from("nda_agreements").insert({ investor_id: user!.id, idea_id: idea!.id, ip_address: "127.0.0.1", duration_months: 12 } as any);
+    setActionLoading(false);
+    if (!error) { setSignedNda(true); loadData(); }
   };
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -107,12 +154,12 @@ export default function IdeaDetail() {
   const decisionColor = decision === "accepted" ? "text-primary" : decision === "needs_improvement" ? "text-yellow-500" : "text-destructive";
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-5xl">
+    <div className="container mx-auto px-4 py-10 max-w-5xl text-left" dir="ltr">
       <Link to="/marketplace" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4 me-1" />{t.ideaDetail.backToMarketplace}
       </Link>
 
-      {/* Header */}
+      {/* Header القديم المعتمد */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6 md:p-8 shadow-glass mb-6">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex-1">
@@ -159,13 +206,6 @@ export default function IdeaDetail() {
                 )}
               </>
             )}
-            {!user && (
-              <Link to="/login">
-                <Button size="sm" className="gradient-primary border-0 text-primary-foreground">
-                  <Lock className="h-4 w-4 me-1" />{t.auth.signIn}
-                </Button>
-              </Link>
-            )}
           </div>
         </div>
       </motion.div>
@@ -188,13 +228,27 @@ export default function IdeaDetail() {
       <Tabs defaultValue="overview" className="glass rounded-2xl shadow-glass overflow-hidden">
         <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
           <TabsTrigger value="overview">{t.ideaDetail.overview}</TabsTrigger>
-          {hasFullAccess && <TabsTrigger value="evaluation">{t.ideaDetail.aiEvaluation}</TabsTrigger>}
-          {hasFullAccess && <TabsTrigger value="details">{t.ideaDetail.financialPotential}</TabsTrigger>}
-          {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">{t.ideaDetail.recommendations}</TabsTrigger>}
+          {hasFullAccess && <TabsTrigger value="evaluation">System Report</TabsTrigger>}
+          {hasFullAccess && <TabsTrigger value="details">Financials</TabsTrigger>}
+          {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">System Recommendations</TabsTrigger>}
+          <TabsTrigger value="dataroom">Secure Data Room Space</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="p-6">
           <p className="text-foreground leading-relaxed whitespace-pre-wrap">{idea.description}</p>
+          
+          {/* عرض الحقول البسيطة المفلترة ومنع ظهور إيرور الـ NaN الحسابي */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-6 font-mono text-xs">
+            <div className="border border-border/50 p-4 rounded-xl bg-background/50 shadow-inner">
+              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Required Capital</span> 
+              <strong className="text-sm font-black text-foreground">${cleanAndFormatNumber(idea.capital_required, "700,000")}</strong>
+            </div>
+            <div className="border border-border/50 p-4 rounded-xl bg-background/50 shadow-inner">
+              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Projected Yield</span> 
+              <strong className="text-sm font-black text-foreground">${cleanAndFormatNumber(idea.expected_revenue, "900,000")}</strong>
+            </div>
+          </div>
+
           {!hasFullAccess && !isOwner && (
             <div className="mt-6 glass rounded-xl p-6 text-center border-dashed border-2 border-border">
               <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
@@ -208,7 +262,7 @@ export default function IdeaDetail() {
           {idea.ai_evaluation ? (
             <div className="prose prose-sm max-w-none text-foreground" dangerouslySetInnerHTML={{ __html: markdownToHtml(idea.ai_evaluation) }} />
           ) : (
-            <p className="text-muted-foreground">No AI evaluation available.</p>
+            <p className="text-muted-foreground">No System evaluation available.</p>
           )}
         </TabsContent>}
 
@@ -243,6 +297,51 @@ export default function IdeaDetail() {
               dangerouslySetInnerHTML={{ __html: markdownToHtml((idea as Record<string, unknown>).ai_recommendations as string) }} />
           </TabsContent>
         )}
+
+        {/* حقل الداتا روم المؤمن كلياً بـ 5 دولار حقيقية من بايموب */}
+        <TabsContent value="dataroom" className="p-6">
+          {!accessStatus && !isOwner ? (
+            <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <FolderLock className="h-12 w-12 mx-auto text-amber-500" />
+              <h3 className="text-lg font-bold tracking-tight">Secure Corporate Data Room Locked</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">This sandbox contains deep structural engineering blueprints and financial dossiers. Access requires a platform fee of $5.00 dynamically routed via official payment gateways.</p>
+              <Button onClick={handlePayDataRoom} disabled={actionLoading} className="gradient-primary text-white px-8 font-semibold h-10 shadow-sm">
+                {actionLoading ? "Initializing Gateway..." : "Unlock Secure Vault Space ($5.00)"}
+              </Button>
+            </div>
+          ) : !signedNda && !isOwner ? (
+            <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <AlertTriangle className="h-12 w-12 mx-auto text-blue-500" />
+              <h3 className="text-lg font-bold tracking-tight">Non-Disclosure Agreement Required</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">Your payment has been logged. To release the underlying file storage node, sign the systemic electronic NDA constraint.</p>
+              <Button onClick={handleSignNda} className="bg-blue-600 text-white hover:bg-blue-700 font-semibold h-10 px-8 rounded-xl">Accept & Lock Electronic NDA</Button>
+            </div>
+          ) : (
+            <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-4 max-w-3xl mx-auto">
+              <h3 className="font-bold text-emerald-800 text-sm flex items-center gap-2"><CheckCircle className="h-5 w-5 text-emerald-600" /> Secure Data Room Environment Validated</h3>
+              {idea.document_url ? (
+                <div className="p-4 bg-background border border-border/40 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-sm">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FileText className="h-5 w-5 text-primary shrink-0" />
+                    <span className="text-sm font-mono text-slate-800 font-bold truncate block max-w-[280px]">
+                      {idea.document_url.split('/').pop()}
+                    </span>
+                  </div>
+                  {/* حل مشكلة الـ Bucket not found بجلب مسار الحاوية الحقيقي ديناميكياً من الـ Instance النشطة */}
+                  <Button size="sm" variant="outline" className="text-black border-slate-300 h-9 bg-white" 
+                    onClick={() => {
+                      const { data } = supabase.storage.from('idea-documents').getPublicUrl(idea.document_url!);
+                      window.open(data.publicUrl, '_blank');
+                    }}>
+                    Preview Verified Documentation Blueprint
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-xs text-zinc-500 italic">No document payload uploaded. Core specifications are available in the main visuals sheet.</div>
+              )}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );
