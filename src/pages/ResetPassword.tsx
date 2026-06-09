@@ -17,15 +17,49 @@ export default function ResetPassword() {
   const [checkingLink, setCheckingLink] = useState(true);
 
   useEffect(() => {
-    const timer = window.setTimeout(async () => {
-      const hash = window.location.hash;
-      const query = window.location.search;
+    (async () => {
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const hashParams = new URLSearchParams(hash);
+      const queryParams = new URLSearchParams(window.location.search);
+
+      const access_token = hashParams.get("access_token") || queryParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token") || queryParams.get("refresh_token");
+      const type = hashParams.get("type") || queryParams.get("type");
+      const errorDesc = hashParams.get("error_description") || queryParams.get("error_description");
+
+      if (errorDesc) {
+        toast({ title: t.common.error, description: errorDesc, variant: "destructive" });
+        navigate("/forgot-password", { replace: true });
+        return;
+      }
+
+      // CRITICAL: a recovery link must establish a fresh session for the
+      // recipient email. Drop any pre-existing session first so we never
+      // update the currently-logged-in user by accident.
+      if (access_token && refresh_token && type === "recovery") {
+        try { await supabase.auth.signOut({ scope: "local" } as any); } catch {}
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        // Strip tokens from the URL so a reload can't re-apply them.
+        window.history.replaceState({}, "", "/reset-password");
+        if (error) {
+          toast({ title: t.common.error, description: error.message, variant: "destructive" });
+          navigate("/forgot-password", { replace: true });
+          return;
+        }
+        setCheckingLink(false);
+        return;
+      }
+
+      // No tokens at all → must come from the email link.
       const { data } = await supabase.auth.getSession();
-      const looksLikeRecovery = hash.includes("type=recovery") || query.includes("type=recovery") || !!data.session;
-      if (!looksLikeRecovery) navigate("/forgot-password", { replace: true });
-      else setCheckingLink(false);
-    }, 350);
-    return () => window.clearTimeout(timer);
+      if (!data.session) {
+        navigate("/forgot-password", { replace: true });
+        return;
+      }
+      setCheckingLink(false);
+    })();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

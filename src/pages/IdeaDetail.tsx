@@ -341,9 +341,18 @@ export default function IdeaDetail() {
                   </div>
                   {/* حل مشكلة الـ Bucket not found بجلب مسار الحاوية الحقيقي ديناميكياً من الـ Instance النشطة */}
                   <Button size="sm" variant="outline" className="text-black border-slate-300 h-9 bg-white" 
-                    onClick={() => {
-                      const { data } = supabase.storage.from('idea-documents').getPublicUrl(idea.document_url!);
-                      window.open(data.publicUrl, '_blank');
+                    onClick={async () => {
+                      // Bucket is private — use a short-lived signed URL.
+                      const path = idea.document_url!.replace(/^idea-documents\//, "");
+                      const { data, error } = await supabase
+                        .storage
+                        .from('idea-documents')
+                        .createSignedUrl(path, 60 * 10);
+                      if (error || !data?.signedUrl) {
+                        toast({ title: "Unable to open document", description: error?.message || "File not found", variant: "destructive" });
+                        return;
+                      }
+                      window.open(data.signedUrl, '_blank');
                     }}>
                     Preview Verified Documentation Blueprint
                   </Button>
