@@ -157,6 +157,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     const { data, error } = await supabase.functions.invoke("paymob-initiate", {
       body: {
         idea_id: ideaId,
+        deal_id: activeDeal.id,
         amount_usd: Number(activeDeal.investment_amount_usd),
         equity_percentage: activeDeal.equity_percentage,
         valuation_usd: activeDeal.valuation_usd,

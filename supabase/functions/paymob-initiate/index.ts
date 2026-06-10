@@ -31,9 +31,8 @@ Deno.serve(async (req) => {
     const { data: ud } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (!ud.user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: corsHeaders });
 
-    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, payment_type } = await req.json();
-    const isDataRoom = payment_type === "data_room_fee";
-    const effectiveAmountUsd = isDataRoom ? 5.0 : amount_usd;
+    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, deal_id } = await req.json();
+    const effectiveAmountUsd = amount_usd;
     if (!idea_id || !effectiveAmountUsd || effectiveAmountUsd <= 0) {
       return new Response(JSON.stringify({ error: "Missing fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -47,7 +46,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const platformFee = isDataRoom ? 0 : +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
+    const platformFee = +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
     const fxRate = 50;
     const totalEGPCents = Math.round(effectiveAmountUsd * fxRate * 100);
 
@@ -64,11 +63,22 @@ Deno.serve(async (req) => {
     if (!authRes.ok) throw new Error(`Paymob auth failed: ${JSON.stringify(authJson)}`);
     const token = authJson.token;
 
-    // 2. Create deal (skipped for one-off Data Room fee)
+    // 2. Use the signed deal when available; otherwise create a fresh deal.
     let merchantOrderId: string;
     let dealId: string | null = null;
-    if (isDataRoom) {
-      merchantOrderId = `DR_${idea_id}_${ud.user.id}_${Date.now()}`;
+    if (deal_id) {
+      const { data: existing, error: existingErr } = await supabase
+        .from("deals")
+        .select("id, investor_id, founder_id, payment_status")
+        .eq("id", deal_id)
+        .eq("idea_id", idea_id)
+        .maybeSingle();
+      if (existingErr) throw new Error(`Deal lookup failed: ${existingErr.message}`);
+      if (!existing) throw new Error("Deal not found");
+      if (existing.investor_id !== ud.user.id && existing.founder_id !== ud.user.id) throw new Error("Not allowed for this deal");
+      if (existing.payment_status === "paid") throw new Error("Deal already paid");
+      dealId = existing.id;
+      merchantOrderId = existing.id;
     } else {
       const { data: deal, error: dealErr } = await supabase.from("deals").insert({
       idea_id,
@@ -98,7 +108,7 @@ Deno.serve(async (req) => {
         amount_cents: totalEGPCents,
         currency: "EGP",
         merchant_order_id: merchantOrderId,
-        items: [{ name: (isDataRoom ? `Data Room: ${idea.title}` : `Investment in ${idea.title}`).slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
+        items: [{ name: `Investment in ${idea.title}`.slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
       }),
     });
     const orderJson = await orderRes.json();
