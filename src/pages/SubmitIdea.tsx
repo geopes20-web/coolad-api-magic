@@ -4,6 +4,8 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { streamEvaluation, type ProjectData } from "@/lib/streamChat";
+import * as mammoth from "mammoth/mammoth.browser";
+import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +20,8 @@ import {
   CheckCircle, AlertTriangle, XCircle, RotateCcw, Zap, FileUp, X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
 
 interface ParsedScores {
   innovation: number; market: number; execution: number;
@@ -60,6 +64,69 @@ function parseScoresFromEvaluation(text: string): ParsedScores {
   }
 
   return scores;
+}
+
+async function extractTextFromFile(file: File): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const buffer = await file.arrayBuffer();
+
+  if (["txt", "md", "csv", "json", "rtf"].includes(ext)) {
+    return (await file.text()).slice(0, 30000);
+  }
+
+  if (ext === "docx") {
+    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+    return (result.value || "").slice(0, 30000);
+  }
+
+  if (ext === "pdf") {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false }).promise;
+    const chunks: string[] = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages && chunks.join("\n").length < 30000; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      chunks.push(content.items.map((item: any) => item.str || "").join(" "));
+    }
+    await pdf.destroy();
+    return chunks.join("\n").slice(0, 30000);
+  }
+
+  return new TextDecoder("utf-8", { fatal: false }).decode(buffer).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]+/g, " ").slice(0, 30000);
+}
+
+function extractField(source: string, keys: string[], max = 160): string {
+  for (const key of keys) {
+    const match = source.match(new RegExp(`${key}\\s*[:：\\-]\\s*([^\\n\\r]{2,${max}})`, "i"));
+    if (match?.[1]) return match[1].replace(/[*#`]/g, "").trim();
+  }
+  return "";
+}
+
+function extractLongField(source: string, keys: string[]): string {
+  for (const key of keys) {
+    const match = source.match(new RegExp(`${key}\\s*[:：\\-]\\s*([\\s\\S]{40,900}?)(?=\\n\\s*(?:[A-Z_ ]{3,40}|[\u0600-\u06FF ]{3,40})\\s*[:：\\-]|$)`, "i"));
+    if (match?.[1]) return match[1].replace(/[*#`]/g, "").trim();
+  }
+  return "";
+}
+
+function fillFromExtractedData(current: ProjectData, source: string, file?: File | null): ProjectData {
+  return {
+    name: current.name || extractField(source, ["PROJECT_NAME", "Project Name", "Startup Name", "Title", "اسم المشروع"]) || (file ? file.name.replace(/\.[^.]+$/, "") : "Untitled Project"),
+    description: current.description || extractLongField(source, ["DESCRIPTION", "Idea Overview", "Project Description", "وصف المشروع"]) || source.split("\n").find(l => l.trim().length > 80)?.slice(0, 900) || "Description extracted from uploaded document.",
+    sector: current.sector || extractField(source, ["SECTOR", "Industry", "Market", "المجال", "القطاع"], 80) || "General",
+    location: current.location || extractField(source, ["LOCATION", "Country", "City", "الموقع", "الدولة"], 80),
+    capital: current.capital || extractField(source, ["CAPITAL_REQUIRED", "Required Capital", "Funding Required", "Investment Needed", "رأس المال", "التمويل المطلوب"], 80) || "TBD",
+    expectedRevenue: current.expectedRevenue || extractField(source, ["EXPECTED_REVENUE", "Expected Annual Revenue", "Projected Revenue", "Revenue", "الإيرادات المتوقعة"], 80),
+    teamSize: current.teamSize || extractField(source, ["TEAM_SIZE", "Team Size", "عدد الفريق"], 60),
+    teamExperience: current.teamExperience || extractLongField(source, ["TEAM_EXPERIENCE", "Team Experience", "خبرة الفريق"]),
+    competitors: current.competitors || extractLongField(source, ["COMPETITORS", "Competitors", "المنافسين"]),
+    competitiveAdvantage: current.competitiveAdvantage || extractLongField(source, ["COMPETITIVE_ADVANTAGE", "Competitive Advantage", "ميزة تنافسية"]),
+    targetAudience: current.targetAudience || extractLongField(source, ["TARGET_AUDIENCE", "Target Audience", "Customers", "الجمهور المستهدف"]),
+    timeline: current.timeline || extractField(source, ["TIMELINE", "Time to Market", "الجدول الزمني"], 120),
+    additionalInfo: current.additionalInfo || extractLongField(source, ["ADDITIONAL_INFO", "Additional Info", "معلومات إضافية"]),
+    documentContent: current.documentContent,
+  };
 }
 
 function DecisionBadge({ decision }: { decision: string }) {
@@ -183,16 +250,19 @@ export default function SubmitIdea() {
     setIsLoading(true);
     setShowResult(true);
 
-    // Upload document if present
+    // Upload document if present and extract its content as normal text input.
     let documentUrl: string | null = null;
     let documentText = "";
+    let preparedForm = form;
     if (documentFile) {
       setUploadingDoc(true);
       const filePath = `${user.id}/${Date.now()}-${documentFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("idea-documents")
-        .upload(filePath, documentFile);
+      const [uploadResult, extractedText] = await Promise.all([
+        supabase.storage.from("idea-documents").upload(filePath, documentFile),
+        extractTextFromFile(documentFile).catch(() => ""),
+      ]);
       setUploadingDoc(false);
+      const uploadError = uploadResult.error;
       if (uploadError) {
         toast({ title: t.common.error, description: uploadError.message, variant: "destructive" });
         setIsLoading(false);
@@ -200,21 +270,17 @@ export default function SubmitIdea() {
         return;
       }
       documentUrl = filePath;
-      // Read text from document for AI analysis
-      try {
-        const text = await documentFile.text();
-        if (text && text.length > 0) {
-          documentText = text.substring(0, 10000); // Limit to 10k chars
-        }
-      } catch {
-        // Binary file, can't extract text client-side
+      documentText = extractedText.trim();
+      if (documentText) {
+        preparedForm = fillFromExtractedData(form, documentText, documentFile);
+        setForm(preparedForm);
       }
     }
 
     let fullResult = "";
 
     try {
-      const projectDataWithDoc = { ...form, documentContent: documentText };
+      const projectDataWithDoc = { ...preparedForm, documentContent: documentText };
       await streamEvaluation({
         projectData: projectDataWithDoc,
         onDelta: (chunk) => {
@@ -231,10 +297,10 @@ export default function SubmitIdea() {
           const titleMatch = fullResult.match(/(?:project\s*name|title)[:\-]\s*([^\n]{3,80})/i);
           const sectorMatch = fullResult.match(/sector[:\-]\s*([^\n]{2,40})/i);
           const capitalMatch = fullResult.match(/(?:capital|funding)[^\n]*?\$([\d,]+)/i);
-          const fallbackTitle = form.name || titleMatch?.[1]?.trim() || (documentFile ? documentFile.name.replace(/\.[^.]+$/, "") : "Untitled Project");
-          const fallbackDesc = form.description || fullResult.split("\n").find(l => l.trim().length > 60)?.slice(0, 800) || "Description extracted from uploaded document.";
-          const fallbackSector = form.sector || sectorMatch?.[1]?.trim() || "General";
-          const fallbackCapital = form.capital || (capitalMatch?.[1] ? `$${capitalMatch[1]}` : "TBD");
+          const fallbackTitle = preparedForm.name || titleMatch?.[1]?.trim() || (documentFile ? documentFile.name.replace(/\.[^.]+$/, "") : "Untitled Project");
+          const fallbackDesc = preparedForm.description || fullResult.split("\n").find(l => l.trim().length > 60)?.slice(0, 800) || "Description extracted from uploaded document.";
+          const fallbackSector = preparedForm.sector || sectorMatch?.[1]?.trim() || "General";
+          const fallbackCapital = preparedForm.capital || (capitalMatch?.[1] ? `$${capitalMatch[1]}` : "TBD");
 
           // Publish immediately when the AI accepts it; otherwise keep as draft
           // so the founder can iterate (no admin approval required).
@@ -244,16 +310,16 @@ export default function SubmitIdea() {
             title: fallbackTitle,
             description: fallbackDesc,
             sector: fallbackSector,
-            location: form.location,
+            location: preparedForm.location,
             capital_required: fallbackCapital,
-            expected_revenue: form.expectedRevenue,
-            team_size: form.teamSize,
-            team_experience: form.teamExperience,
-            competitors: form.competitors,
-            competitive_advantage: form.competitiveAdvantage,
-            target_audience: form.targetAudience,
-            timeline: form.timeline,
-            additional_info: form.additionalInfo || "",
+            expected_revenue: preparedForm.expectedRevenue,
+            team_size: preparedForm.teamSize,
+            team_experience: preparedForm.teamExperience,
+            competitors: preparedForm.competitors,
+            competitive_advantage: preparedForm.competitiveAdvantage,
+            target_audience: preparedForm.targetAudience,
+            timeline: preparedForm.timeline,
+            additional_info: preparedForm.additionalInfo || "",
             document_url: documentUrl,
             founder_id: user.id,
             ai_score: scores.overall,

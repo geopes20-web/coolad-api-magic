@@ -52,9 +52,10 @@ export default function ResetPassword() {
         return;
       }
 
-      // No tokens at all → must come from the email link.
+      // No tokens at all → only allow if the recovery link already established a session.
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
+        toast({ title: t.common.error, description: "Open the latest password reset link from your email.", variant: "destructive" });
         navigate("/forgot-password", { replace: true });
         return;
       }
@@ -73,6 +74,13 @@ export default function ResetPassword() {
       return;
     }
     setLoading(true);
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setLoading(false);
+      toast({ title: t.common.error, description: "Auth session missing. Open the latest reset link from your email.", variant: "destructive" });
+      navigate("/forgot-password", { replace: true });
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) {

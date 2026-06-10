@@ -2,7 +2,10 @@
 
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { supabase } from "../supabase/client";
-const lovableAuth = createLovableAuth();
+const isLocalDev = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const lovableAuth = createLovableAuth({
+  oauthBrokerUrl: isLocalDev ? "https://coolad-api-magic.lovable.app/~oauth/initiate" : "/~oauth/initiate",
+});
 
 type SignInOptions = {
   redirect_uri?: string;
