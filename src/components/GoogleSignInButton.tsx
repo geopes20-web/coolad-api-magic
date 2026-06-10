@@ -15,9 +15,8 @@ export default function GoogleSignInButton({ label }: GoogleSignInButtonProps) {
 
   const handleClick = async () => {
     setLoading(true);
-    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: isLocalhost ? "http://localhost:8081" : window.location.origin,
+      redirect_uri: window.location.origin,
       extraParams: { prompt: "select_account" },
     });
     if (result.error) {

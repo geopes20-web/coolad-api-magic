@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
     const obj = payload?.obj || payload;
     const success = obj?.success === true || obj?.success === "true";
     const merchantId: string = String(obj?.order?.merchant_order_id ?? obj?.merchant_order_id ?? "");
-    const amountCents = Number(obj?.amount_cents ?? obj?.order?.amount_cents ?? 0);
 
     if (!merchantId) {
       return new Response(JSON.stringify({ ok: false, reason: "no merchant id" }), {
@@ -31,13 +30,23 @@ Deno.serve(async (req) => {
     await admin.from("payment_events").insert({
       provider: "paymob",
       event_type: success ? "paid" : "failed",
-      status: success ? "paid" : "failed",
-      deal_id: merchantId,
-      external_reference: merchantId,
-      amount_usd: amountCents ? +(amountCents / 100 / 50).toFixed(2) : null,
-      currency: obj?.currency || obj?.order?.currency || "EGP",
+      merchant_order_id: merchantId,
       raw_payload: payload,
     } as any).then(() => {}, () => {});
+
+    // --- Data Room one-off purchase ---
+    if (merchantId.startsWith("DR_")) {
+      const parts = merchantId.split("_"); // DR_{idea_id}_{user_id}_{ts}
+      const idea_id = parts[1];
+      const user_id = parts[2];
+      if (success && idea_id && user_id) {
+        await admin.from("data_room_access").upsert(
+          { user_id, idea_id, status: "approved", amount_usd: 5.0, paid_at: new Date().toISOString() },
+          { onConflict: "user_id,idea_id" }
+        );
+      }
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
 
     // --- Investment deal payment ---
     if (success) {

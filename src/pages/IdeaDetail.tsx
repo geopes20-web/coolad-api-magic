@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle, FileText
+  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle, FileText, FolderLock
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -38,6 +38,9 @@ export default function IdeaDetail() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [accessStatus, setAccessStatus] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [signedNda, setSignedNda] = useState(false);
+  const [hasDataRoomAccess, setHasDataRoomAccess] = useState(false);
 
   // دالة ذكية لتنظيف الأرقام ومنع ظهور الـ NaN في واجهتك الأصلية
   const cleanAndFormatNumber = (val: string | null | undefined, fallback = "0") => {
@@ -60,6 +63,17 @@ export default function IdeaDetail() {
       const { data: accessData } = await supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as { data: { status: string } | null };
       setAccessStatus(accessData?.status || null);
       
+      const { data: ndaData } = await supabase.from("nda_agreements").select("id").eq("investor_id", user.id).eq("idea_id", id).maybeSingle();
+      setSignedNda(!!ndaData);
+
+      const { data: drData } = await (supabase as any)
+        .from("data_room_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("idea_id", id)
+        .eq("status", "approved")
+        .maybeSingle();
+      setHasDataRoomAccess(!!drData);
     }
   };
 
@@ -87,6 +101,41 @@ export default function IdeaDetail() {
       setAccessStatus("pending");
       toast({ title: t.common.success, description: t.ideaDetail.accessRequested });
     }
+  };
+
+  // تفعيل الدفع الحقيقي واللحظي لرسوم الداتا روم (5 دولار) للموقع مباشرة عبر بايموب عند الضغط
+  const handlePayDataRoom = async () => {
+    if (!idea) return;
+    setActionLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("paymob-initiate", {
+        body: { 
+          idea_id: idea.id, 
+          amount_usd: 5.00, 
+          payment_type: "data_room_fee",
+          contract_terms: `Secure Data Room Access Fee for project: ${idea.title}` 
+        }
+      });
+      setActionLoading(false);
+      
+      const checkoutUrl = data?.iframe_url || data?.iframeUrl;
+      if (checkoutUrl && !error) {
+        // Use in-app Payment route (iframe) — avoids proxy errors from direct redirect.
+        navigate(`/payment/data-room?iframe=${encodeURIComponent(checkoutUrl)}`);
+      } else {
+        toast({ title: "Payment Error", description: error?.message || "Gateway configuration missing", variant: "destructive" });
+      }
+    } catch {
+      setActionLoading(false);
+      toast({ title: "Connection Failed", variant: "destructive" });
+    }
+  };
+
+  const handleSignNda = async () => {
+    setActionLoading(true);
+    const { error } = await supabase.from("nda_agreements").insert({ investor_id: user!.id, idea_id: idea!.id, ip_address: "127.0.0.1", duration_months: 12 } as any);
+    setActionLoading(false);
+    if (!error) { setSignedNda(true); loadData(); }
   };
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -194,7 +243,7 @@ export default function IdeaDetail() {
           {hasFullAccess && <TabsTrigger value="evaluation">System Report</TabsTrigger>}
           {hasFullAccess && <TabsTrigger value="details">Financials</TabsTrigger>}
           {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">System Recommendations</TabsTrigger>}
-          {hasFullAccess && idea.document_url && <TabsTrigger value="documents">Documents</TabsTrigger>}
+          <TabsTrigger value="dataroom">Secure Data Room Space</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="p-6">
@@ -261,30 +310,50 @@ export default function IdeaDetail() {
           </TabsContent>
         )}
 
-        {hasFullAccess && idea.document_url && (
-          <TabsContent value="documents" className="p-6">
-            <div className="p-4 bg-background border border-border/40 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-sm">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <FileText className="h-5 w-5 text-primary shrink-0" />
-                <span className="text-sm font-mono text-foreground font-bold truncate block max-w-[280px]">
-                  {idea.document_url.split('/').pop()}
-                </span>
-              </div>
-              <Button size="sm" variant="outline"
-                onClick={async () => {
-                  const path = idea.document_url!.replace(/^idea-documents\//, "");
-                  const { data, error } = await supabase.storage.from("idea-documents").createSignedUrl(path, 60 * 10);
-                  if (error || !data?.signedUrl) {
-                    toast({ title: "Unable to open document", description: error?.message || "File not found", variant: "destructive" });
-                    return;
-                  }
-                  window.open(data.signedUrl, "_blank");
-                }}>
-                Preview document
+        {/* حقل الداتا روم المؤمن كلياً بـ 5 دولار حقيقية من بايموب */}
+        <TabsContent value="dataroom" className="p-6">
+          {!hasDataRoomAccess && !isOwner && userRole !== "admin" ? (
+            <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <FolderLock className="h-12 w-12 mx-auto text-amber-500" />
+              <h3 className="text-lg font-bold tracking-tight">Secure Corporate Data Room Locked</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">This sandbox contains deep structural engineering blueprints and financial dossiers. Access requires a platform fee of $5.00 dynamically routed via official payment gateways.</p>
+              <Button onClick={handlePayDataRoom} disabled={actionLoading} className="gradient-primary text-white px-8 font-semibold h-10 shadow-sm">
+                {actionLoading ? "Initializing Gateway..." : "Unlock Secure Vault Space ($5.00)"}
               </Button>
             </div>
-          </TabsContent>
-        )}
+          ) : !signedNda && !isOwner ? (
+            <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <AlertTriangle className="h-12 w-12 mx-auto text-blue-500" />
+              <h3 className="text-lg font-bold tracking-tight">Non-Disclosure Agreement Required</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">Your payment has been logged. To release the underlying file storage node, sign the systemic electronic NDA constraint.</p>
+              <Button onClick={handleSignNda} className="bg-blue-600 text-white hover:bg-blue-700 font-semibold h-10 px-8 rounded-xl">Accept & Lock Electronic NDA</Button>
+            </div>
+          ) : (
+            <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-4 max-w-3xl mx-auto">
+              <h3 className="font-bold text-emerald-800 text-sm flex items-center gap-2"><CheckCircle className="h-5 w-5 text-emerald-600" /> Secure Data Room Environment Validated</h3>
+              {idea.document_url ? (
+                <div className="p-4 bg-background border border-border/40 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-sm">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FileText className="h-5 w-5 text-primary shrink-0" />
+                    <span className="text-sm font-mono text-slate-800 font-bold truncate block max-w-[280px]">
+                      {idea.document_url.split('/').pop()}
+                    </span>
+                  </div>
+                  {/* حل مشكلة الـ Bucket not found بجلب مسار الحاوية الحقيقي ديناميكياً من الـ Instance النشطة */}
+                  <Button size="sm" variant="outline" className="text-black border-slate-300 h-9 bg-white" 
+                    onClick={() => {
+                      const { data } = supabase.storage.from('idea-documents').getPublicUrl(idea.document_url!);
+                      window.open(data.publicUrl, '_blank');
+                    }}>
+                    Preview Verified Documentation Blueprint
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-xs text-zinc-500 italic">No document payload uploaded. Core specifications are available in the main visuals sheet.</div>
+              )}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );

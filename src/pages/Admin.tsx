@@ -1,6 +1,6 @@
 /**
  * Admin Dashboard
- * Essential control center for IDEVEST: stats, KYC, users, ideas, reports, payments, and access requests.
+ * Essential control center for IDEVEST: stats, KYC, users, ideas, reports, payments, and data-room access.
  */
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
@@ -31,7 +31,7 @@ type IdeaRow = { id: string; title: string; sector: string; status: string; ai_s
 type DealRow = { id: string; idea_id: string; investment_amount_usd: number; platform_fee_amount: number | null; payment_status: string; escrow_status: string | null; status: string; created_at: string };
 type PaymentEvent = { id: string; deal_id: string | null; provider: string; external_reference: string | null; amount_usd: number | null; currency: string | null; status: string; event_type: string; created_at: string; raw_payload: any };
 type ReportRow = { id: string; target_type: string; target_id: string; reason: string; details: string | null; status: string; created_at: string };
-type AccessRow = { id: string; idea_id: string; investor_id: string; founder_id: string; status: string; created_at: string; message?: string | null; ideas?: { title: string } | null };
+type AccessRow = { id: string; idea_id: string; investor_id: string; founder_id: string; status: string; payment_status?: string; data_room_fee_usd?: number; created_at: string; message?: string | null; ideas?: { title: string } | null };
 type Stats = Record<string, number>;
 
 export default function Admin() {
@@ -67,7 +67,7 @@ export default function Admin() {
       supabase.from("ideas").select("id,title,sector,status,ai_score,founder_id,created_at,listing_type").order("created_at", { ascending: false }),
       supabase.from("deals").select("id,idea_id,investment_amount_usd,platform_fee_amount,payment_status,escrow_status,status,created_at").order("created_at", { ascending: false }),
       supabase.from("reports").select("id,target_type,target_id,reason,details,status,created_at").order("created_at", { ascending: false }),
-      (supabase as any).from("access_requests").select("id,idea_id,investor_id,founder_id,status,message,created_at,ideas(title)").order("created_at", { ascending: false }),
+      (supabase as any).from("access_requests").select("id,idea_id,investor_id,founder_id,status,payment_status,data_room_fee_usd,message,created_at,ideas(title)").order("created_at", { ascending: false }),
       supabase.from("payment_events").select("*").order("created_at", { ascending: false }).limit(200),
     ]);
     setStats((s.data as Stats) || {});
@@ -114,7 +114,7 @@ export default function Admin() {
   const updateAccess = async (id: string, status: "approved" | "rejected") => {
     const { error } = await (supabase as any).from("access_requests").update({ status }).eq("id", id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: isAr ? "تم تحديث طلب الوصول" : "Access request updated" }); loadAll(); }
+    else { toast({ title: isAr ? "تم تحديث طلب الداتا روم" : "Data-room request updated" }); loadAll(); }
   };
 
   const updateReport = async (id: string, status: "reviewing" | "resolved" | "dismissed") => {
@@ -188,7 +188,7 @@ export default function Admin() {
           <Tabs defaultValue="kyc" className="w-full">
             <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 mb-6 h-auto">
               <TabsTrigger value="kyc">KYC ({kycList.filter(k => k.status === "pending").length})</TabsTrigger>
-              <TabsTrigger value="access">Access ({accessRequests.length})</TabsTrigger>
+              <TabsTrigger value="access">Data Room ({accessRequests.length})</TabsTrigger>
               <TabsTrigger value="payments">{isAr ? "أرباح الصفقات" : "Deals Revenue"} ({deals.length})</TabsTrigger>
               <TabsTrigger value="transfers">Transfers ({paymentEvents.length})</TabsTrigger>
               <TabsTrigger value="reports">Reports ({reports.filter(r => r.status === "open").length})</TabsTrigger>
@@ -198,7 +198,7 @@ export default function Admin() {
 
             <TabsContent value="kyc" className="space-y-2">{kycList.map(k => <Row key={k.id} title={k.full_legal_name || "—"} sub={`${k.national_id || "—"} · ${k.phone_number || "—"}`} status={k.status}><Button size="sm" variant="outline" onClick={() => setSelectedKyc(k)}><Eye className="h-4 w-4 me-1" />{isAr ? "مراجعة" : "Review"}</Button></Row>)}</TabsContent>
 
-            <TabsContent value="access" className="space-y-2">{accessRequests.map(a => <Row key={a.id} title={a.ideas?.title || a.idea_id} sub={a.message || (isAr ? "طلب وصول لتفاصيل المشروع" : "Project access request")} status={a.status}><Button size="sm" variant="outline" onClick={() => updateAccess(a.id, "rejected")}><X className="h-4 w-4" /></Button><Button size="sm" onClick={() => updateAccess(a.id, "approved")} className="gradient-primary border-0 text-primary-foreground"><Check className="h-4 w-4" /></Button></Row>)}</TabsContent>
+            <TabsContent value="access" className="space-y-2">{accessRequests.map(a => <Row key={a.id} title={a.ideas?.title || a.idea_id} sub={`Fee $${a.data_room_fee_usd ?? 5} · ${a.payment_status || "unpaid"}`} status={a.status}><Button size="sm" variant="outline" onClick={() => updateAccess(a.id, "rejected")}><X className="h-4 w-4" /></Button><Button size="sm" onClick={() => updateAccess(a.id, "approved")} className="gradient-primary border-0 text-primary-foreground"><Check className="h-4 w-4" /></Button></Row>)}</TabsContent>
 
             <TabsContent value="payments" className="space-y-3">
               <div className="glass rounded-xl p-4 mb-4 border border-emerald-500/20 bg-emerald-500/5">

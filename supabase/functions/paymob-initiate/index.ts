@@ -9,15 +9,6 @@ const corsHeaders = {
 const PAYMOB_BASE = "https://accept.paymob.com/api";
 const PLATFORM_FEE_PCT = 10;
 
-async function readJsonResponse(res: Response, label: string) {
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch { /* Paymob sometimes returns HTML on upstream errors */ }
-  if (!res.ok) throw new Error(`${label} failed (${res.status}): ${json ? JSON.stringify(json) : text.slice(0, 300)}`);
-  if (!json) throw new Error(`${label} returned an invalid response`);
-  return json;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -40,8 +31,9 @@ Deno.serve(async (req) => {
     const { data: ud } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (!ud.user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: corsHeaders });
 
-    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, deal_id } = await req.json();
-    const effectiveAmountUsd = amount_usd;
+    const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, payment_type } = await req.json();
+    const isDataRoom = payment_type === "data_room_fee";
+    const effectiveAmountUsd = isDataRoom ? 5.0 : amount_usd;
     if (!idea_id || !effectiveAmountUsd || effectiveAmountUsd <= 0) {
       return new Response(JSON.stringify({ error: "Missing fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -55,7 +47,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const platformFee = +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
+    const platformFee = isDataRoom ? 0 : +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
     const fxRate = 50;
     const totalEGPCents = Math.round(effectiveAmountUsd * fxRate * 100);
 
@@ -68,30 +60,15 @@ Deno.serve(async (req) => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: PAYMOB_API_KEY }),
     });
-    const authJson = await readJsonResponse(authRes, "Paymob auth");
+    const authJson = await authRes.json();
+    if (!authRes.ok) throw new Error(`Paymob auth failed: ${JSON.stringify(authJson)}`);
     const token = authJson.token;
 
-    // 2. Use the signed deal when available; otherwise create a fresh deal.
+    // 2. Create deal (skipped for one-off Data Room fee)
     let merchantOrderId: string;
     let dealId: string | null = null;
-    if (deal_id) {
-      const { data: existing, error: existingErr } = await supabase
-        .from("deals")
-        .select("id, investor_id, founder_id, payment_status")
-        .eq("id", deal_id)
-        .eq("idea_id", idea_id)
-        .maybeSingle();
-      if (existingErr) throw new Error(`Deal lookup failed: ${existingErr.message}`);
-      if (!existing) throw new Error("Deal not found");
-      if (existing.investor_id !== ud.user.id && existing.founder_id !== ud.user.id) throw new Error("Not allowed for this deal");
-      if (existing.payment_status === "paid") throw new Error("Deal already paid");
-      await supabase.from("deals").update({
-        platform_fee_percentage: PLATFORM_FEE_PCT,
-        platform_fee_amount: platformFee,
-        payment_status: "pending",
-      }).eq("id", existing.id);
-      dealId = existing.id;
-      merchantOrderId = existing.id;
+    if (isDataRoom) {
+      merchantOrderId = `DR_${idea_id}_${ud.user.id}_${Date.now()}`;
     } else {
       const { data: deal, error: dealErr } = await supabase.from("deals").insert({
       idea_id,
@@ -121,10 +98,11 @@ Deno.serve(async (req) => {
         amount_cents: totalEGPCents,
         currency: "EGP",
         merchant_order_id: merchantOrderId,
-        items: [{ name: `Investment in ${idea.title}`.slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
+        items: [{ name: (isDataRoom ? `Data Room: ${idea.title}` : `Investment in ${idea.title}`).slice(0, 50), amount_cents: totalEGPCents, description: "IDEVEST", quantity: 1 }],
       }),
     });
-    const orderJson = await readJsonResponse(orderRes, "Paymob order");
+    const orderJson = await orderRes.json();
+    if (!orderRes.ok) throw new Error(`Paymob order failed: ${JSON.stringify(orderJson)}`);
 
     // 4. Payment key
     const { data: profile } = await supabase.from("profiles").select("full_name, phone_number").eq("id", ud.user.id).maybeSingle();
@@ -152,7 +130,8 @@ Deno.serve(async (req) => {
         redirection_url: redirectionUrl,
       }),
     });
-    const keyJson = await readJsonResponse(keyRes, "Paymob payment key");
+    const keyJson = await keyRes.json();
+    if (!keyRes.ok) throw new Error(`Paymob payment_key failed: ${JSON.stringify(keyJson)}`);
 
     const iframeId = Deno.env.get("PAYMOB_IFRAME_ID") || "";
     const iframeUrl = iframeId
@@ -174,7 +153,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("paymob-initiate error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
