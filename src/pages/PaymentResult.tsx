@@ -11,11 +11,13 @@ export default function PaymentResult() {
   const { language } = useLanguage();
   const isAr = language === "ar";
 
-  const orderId =
-    params.get("merchant_order_id") ||
-    params.get("order") ||
-    params.get("deal_id") ||
-    sessionStorage.getItem("paymob_deal_id");
+  // Prefer the internal deal UUID stored in sessionStorage. Paymob's
+  // merchant_order_id is now a numeric reference (external_reference), not the deal.id.
+  const sessionDealId = sessionStorage.getItem("paymob_deal_id");
+  const merchantRef =
+    params.get("merchant_order_id") || params.get("order") || params.get("deal_id");
+  const orderId = sessionDealId || merchantRef;
+  const isUuid = !!orderId && /^[0-9a-f-]{36}$/i.test(orderId);
 
   const successParam = params.get("success");
 
@@ -26,11 +28,12 @@ export default function PaymentResult() {
 
   const fetchDeal = async () => {
     if (!orderId) { setLoading(false); return null; }
-    const { data } = await supabase
+    const query = supabase
       .from("deals")
-      .select("id, payment_status, status, investment_amount_usd, contract_url")
-      .eq("id", orderId)
-      .maybeSingle();
+      .select("id, payment_status, status, investment_amount_usd, contract_url");
+    const { data } = await (isUuid
+      ? query.eq("id", orderId).maybeSingle()
+      : query.eq("external_reference", orderId).maybeSingle());
     setDeal(data);
     setLoading(false);
     return data;
@@ -40,18 +43,20 @@ export default function PaymentResult() {
     if (!orderId) { setLoading(false); return; }
 
     if (successParam === "true") {
-      supabase.from("deals").update({
+      const upd = supabase.from("deals").update({
         payment_status: "paid",
         escrow_status: "held",
         status: "signed",
-      }).eq("id", orderId).then(() => {
-        fetchDeal();
-        sessionStorage.removeItem("paymob_deal_id");
       });
+      (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
+        .then(() => {
+          fetchDeal();
+          sessionStorage.removeItem("paymob_deal_id");
+        });
     } else if (successParam === "false") {
-      supabase.from("deals").update({
-        payment_status: "failed",
-      }).eq("id", orderId).then(() => fetchDeal());
+      const upd = supabase.from("deals").update({ payment_status: "failed" });
+      (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
+        .then(() => fetchDeal());
     } else {
       let cancelled = false;
       let attempts = 0;

@@ -17,40 +17,31 @@ export type Database = {
       access_requests: {
         Row: {
           created_at: string
-          data_room_fee_usd: number
           founder_id: string
           id: string
           idea_id: string
           investor_id: string
           message: string | null
-          payment_reference: string | null
-          payment_status: string
           status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
-          data_room_fee_usd?: number
           founder_id: string
           id?: string
           idea_id: string
           investor_id: string
           message?: string | null
-          payment_reference?: string | null
-          payment_status?: string
           status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
-          data_room_fee_usd?: number
           founder_id?: string
           id?: string
           idea_id?: string
           investor_id?: string
           message?: string | null
-          payment_reference?: string | null
-          payment_status?: string
           status?: string
           updated_at?: string
         }
@@ -204,47 +195,6 @@ export type Database = {
         }
         Relationships: []
       }
-      data_room_access: {
-        Row: {
-          amount_usd: number
-          created_at: string
-          id: string
-          idea_id: string
-          paid_at: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount_usd?: number
-          created_at?: string
-          id?: string
-          idea_id: string
-          paid_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount_usd?: number
-          created_at?: string
-          id?: string
-          idea_id?: string
-          paid_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "data_room_access_idea_id_fkey"
-            columns: ["idea_id"]
-            isOneToOne: false
-            referencedRelation: "ideas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       deals: {
         Row: {
           contract_terms: string
@@ -254,6 +204,7 @@ export type Database = {
           equity_percentage: number | null
           escrow_hold_id: string | null
           escrow_status: string | null
+          external_reference: string | null
           founder_id: string
           founder_signed_at: string | null
           id: string
@@ -278,6 +229,7 @@ export type Database = {
           equity_percentage?: number | null
           escrow_hold_id?: string | null
           escrow_status?: string | null
+          external_reference?: string | null
           founder_id: string
           founder_signed_at?: string | null
           id?: string
@@ -302,6 +254,7 @@ export type Database = {
           equity_percentage?: number | null
           escrow_hold_id?: string | null
           escrow_status?: string | null
+          external_reference?: string | null
           founder_id?: string
           founder_signed_at?: string | null
           id?: string

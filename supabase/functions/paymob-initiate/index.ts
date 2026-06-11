@@ -8,6 +8,11 @@ const corsHeaders = {
 
 const PAYMOB_BASE = "https://accept.paymob.com/api";
 const PLATFORM_FEE_PCT = 10;
+const FX_USD_TO_EGP = 50;
+
+function makeMerchantOrderId() {
+  return Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -15,8 +20,9 @@ Deno.serve(async (req) => {
   try {
     const PAYMOB_API_KEY = Deno.env.get("PAYMOB_API_KEY");
     const INTEGRATION_ID = Deno.env.get("PAYMOB_INTEGRATION_ID");
-    if (!PAYMOB_API_KEY || !INTEGRATION_ID) {
-      return new Response(JSON.stringify({ error: "Paymob not configured" }), {
+    const IFRAME_ID = Deno.env.get("PAYMOB_IFRAME_ID");
+    if (!PAYMOB_API_KEY || !INTEGRATION_ID || !IFRAME_ID) {
+      return new Response(JSON.stringify({ error: "Paymob not configured (need PAYMOB_API_KEY, PAYMOB_INTEGRATION_ID, PAYMOB_IFRAME_ID)" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -48,8 +54,7 @@ Deno.serve(async (req) => {
     }
 
     const platformFee = isDataRoom ? 0 : +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
-    const fxRate = 50;
-    const totalEGPCents = Math.round(effectiveAmountUsd * fxRate * 100);
+    const totalEGPCents = Math.round(effectiveAmountUsd * FX_USD_TO_EGP * 100);
 
     // ✅ Dynamic redirection URL based on request origin
     const origin = req.headers.get("origin") || "https://coolad-api-magic.lovable.app";
@@ -65,11 +70,12 @@ Deno.serve(async (req) => {
     const token = authJson.token;
 
     // 2. Create deal (skipped for one-off Data Room fee)
-    let merchantOrderId: string;
+    let merchantOrderId: number | string;
     let dealId: string | null = null;
     if (isDataRoom) {
       merchantOrderId = `DR_${idea_id}_${ud.user.id}_${Date.now()}`;
     } else {
+      merchantOrderId = makeMerchantOrderId();
       const { data: deal, error: dealErr } = await supabase.from("deals").insert({
       idea_id,
       investor_id: ud.user.id,
@@ -83,10 +89,10 @@ Deno.serve(async (req) => {
       payment_status: "pending",
       escrow_status: "none",
       status: "pending_founder",
+      external_reference: String(merchantOrderId),
       }).select().single();
       if (dealErr) throw new Error(`Deal creation failed: ${dealErr.message}`);
       dealId = deal.id;
-      merchantOrderId = deal.id;
     }
 
     // 3. Order
@@ -133,10 +139,7 @@ Deno.serve(async (req) => {
     const keyJson = await keyRes.json();
     if (!keyRes.ok) throw new Error(`Paymob payment_key failed: ${JSON.stringify(keyJson)}`);
 
-    const iframeId = Deno.env.get("PAYMOB_IFRAME_ID") || "";
-    const iframeUrl = iframeId
-      ? `https://accept.paymob.com/api/acceptance/iframes/${iframeId}?payment_token=${keyJson.token}`
-      : null;
+    const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${IFRAME_ID}?payment_token=${keyJson.token}`;
 
     return new Response(JSON.stringify({
       ok: true,
