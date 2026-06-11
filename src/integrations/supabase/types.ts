@@ -204,6 +204,7 @@ export type Database = {
           equity_percentage: number | null
           escrow_hold_id: string | null
           escrow_status: string | null
+          external_reference: string | null
           founder_id: string
           founder_signed_at: string | null
           id: string
@@ -228,6 +229,7 @@ export type Database = {
           equity_percentage?: number | null
           escrow_hold_id?: string | null
           escrow_status?: string | null
+          external_reference?: string | null
           founder_id: string
           founder_signed_at?: string | null
           id?: string
@@ -252,6 +254,7 @@ export type Database = {
           equity_percentage?: number | null
           escrow_hold_id?: string | null
           escrow_status?: string | null
+          external_reference?: string | null
           founder_id?: string
           founder_signed_at?: string | null
           id?: string
