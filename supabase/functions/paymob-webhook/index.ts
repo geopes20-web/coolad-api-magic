@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
         payment_status: "paid",
         escrow_status: "held",
         status: "signed",
-      }).eq("id", merchantId);
+      }).eq("external_reference", merchantId);
     } else {
-      await admin.from("deals").update({ payment_status: "failed" }).eq("id", merchantId);
+      await admin.from("deals").update({ payment_status: "failed" }).eq("external_reference", merchantId);
     }
 
     return new Response("OK", { status: 200, headers: corsHeaders });
