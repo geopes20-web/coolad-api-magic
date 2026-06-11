@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { idea_id, amount_usd, equity_percentage, valuation_usd, contract_terms, payment_type, deal_id } = await req.json();
     const isDataRoom = payment_type === "data_room_fee";
-    const effectiveAmountUsd = isDataRoom ? 5.0 : amount_usd;
+    const effectiveAmountUsd = isDataRoom ? 5.0 : (amount_usd || 0);
     
     console.log("📥 Request params:", { idea_id, amount_usd, effectiveAmountUsd, isDataRoom, deal_id });
     
@@ -104,15 +104,16 @@ Deno.serve(async (req) => {
     // 2. Create or reuse deal
     let merchantOrderId: number | string;
     let dealId: string | null = null;
-    
+
     if (isDataRoom) {
       merchantOrderId = `DR_${idea_id}_${ud.user.id}_${Date.now()}`;
       console.log("💳 Data Room payment, merchant ID:", merchantOrderId);
     } else if (deal_id) {
       // Use existing deal
       console.log("♻️ Using existing deal:", deal_id);
-      const { data: existing } = await supabase.from("deals").select("id").eq("id", deal_id).maybeSingle();
+      const { data: existing } = await supabase.from("deals").select("id, external_reference").eq("id", deal_id).maybeSingle();
       if (!existing) throw new Error("Deal not found");
+      if (existing.external_reference) throw new Error("Deal already has pending payment");
       dealId = deal_id;
       merchantOrderId = makeMerchantOrderId();
     } else {

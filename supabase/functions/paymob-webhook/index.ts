@@ -15,7 +15,10 @@ Deno.serve(async (req) => {
     const success = obj?.success === true || obj?.success === "true";
     const merchantId: string = String(obj?.order?.merchant_order_id ?? obj?.merchant_order_id ?? "");
 
+    console.log("📥 Webhook received:", { merchantId, success, type: obj?.type });
+
     if (!merchantId) {
+      console.warn("⚠️ No merchant ID found in webhook");
       return new Response(JSON.stringify({ ok: false, reason: "no merchant id" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -32,36 +35,50 @@ Deno.serve(async (req) => {
       event_type: success ? "paid" : "failed",
       merchant_order_id: merchantId,
       raw_payload: payload,
-    } as any).then(() => {}, () => {});
+    } as any).then(() => {
+      console.log("✅ Event logged");
+    }, (err) => {
+      console.error("⚠️ Failed to log event:", err);
+    });
 
     // --- Data Room one-off purchase ---
     if (merchantId.startsWith("DR_")) {
+      console.log("💳 Processing data room payment...");
       const parts = merchantId.split("_"); // DR_{idea_id}_{user_id}_{ts}
       const idea_id = parts[1];
       const user_id = parts[2];
       if (success && idea_id && user_id) {
+        console.log("✅ Granting data room access:", { idea_id, user_id });
         await admin.from("data_room_access").upsert(
           { user_id, idea_id, status: "approved", amount_usd: 5.0, paid_at: new Date().toISOString() },
           { onConflict: "user_id,idea_id" }
         );
+        await admin.from("access_requests").update({ status: "approved", payment_status: "paid", message: "Data room fee paid via Paymob" })
+          .eq("idea_id", idea_id)
+          .eq("investor_id", user_id)
+          .eq("transaction_type", "data_room_fee");
       }
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
     // --- Investment deal payment ---
+    console.log("📊 Processing deal payment, status:", success ? "PAID" : "FAILED");
     if (success) {
-      await admin.from("deals").update({
+      const { error } = await admin.from("deals").update({
         payment_status: "paid",
         escrow_status: "held",
         status: "signed",
       }).eq("external_reference", merchantId);
+      if (error) console.error("❌ Deal update error:", error);
+      else console.log("✅ Deal marked as paid");
     } else {
-      await admin.from("deals").update({ payment_status: "failed" }).eq("external_reference", merchantId);
+      const { error } = await admin.from("deals").update({ payment_status: "failed" }).eq("external_reference", merchantId);
+      if (error) console.error("❌ Deal failure update error:", error);
     }
 
     return new Response("OK", { status: 200, headers: corsHeaders });
   } catch (e) {
-    console.error("paymob-webhook error", e);
+    console.error("❌ paymob-webhook error", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

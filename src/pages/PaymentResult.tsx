@@ -4,24 +4,30 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PaymentResult() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user, userRole } = useAuth();
   const isAr = language === "ar";
 
-  // Prefer the internal deal UUID stored in sessionStorage. Paymob's
-  // merchant_order_id is now a numeric reference (external_reference), not the deal.id.
   const sessionDealId = sessionStorage.getItem("paymob_deal_id");
+  const sessionPaymentType = sessionStorage.getItem("paymob_payment_type");
+  const sessionIdeaId = sessionStorage.getItem("paymob_idea_id");
   const merchantRef =
     params.get("merchant_order_id") || params.get("order") || params.get("deal_id");
   const orderId = sessionDealId || merchantRef;
+  const paymentType = params.get("payment_type") || sessionPaymentType || undefined;
+  const ideaId = params.get("idea_id") || sessionIdeaId || undefined;
+  const isDataRoom = paymentType === "data_room_fee";
   const isUuid = !!orderId && /^[0-9a-f-]{36}$/i.test(orderId);
 
   const successParam = params.get("success");
 
   const [deal, setDeal] = useState<any>(null);
+  const [accessVerified, setAccessVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showFallback, setShowFallback] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -39,58 +45,97 @@ export default function PaymentResult() {
     return data;
   };
 
-  useEffect(() => {
-    if (!orderId) { setLoading(false); return; }
+  const fetchAccess = async () => {
+    if (!user?.id || !ideaId) return false;
+    const { data } = await supabase
+      .from("data_room_access")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .eq("idea_id", ideaId)
+      .maybeSingle();
+    const approved = !!data && data.status === "approved";
+    setAccessVerified(approved);
+    setLoading(false);
+    return approved;
+  };
 
-    if (successParam === "true") {
-      const upd = supabase.from("deals").update({
-        payment_status: "paid",
-        escrow_status: "held",
-        status: "signed",
-      });
-      (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
-        .then(() => {
-          fetchDeal();
-          sessionStorage.removeItem("paymob_deal_id");
-        });
-    } else if (successParam === "false") {
-      const upd = supabase.from("deals").update({ payment_status: "failed" });
-      (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
-        .then(() => fetchDeal());
+  useEffect(() => {
+    if (!orderId && !isDataRoom) { setLoading(false); return; }
+    if (isDataRoom) {
+      if (successParam === "false") {
+        setLoading(false);
+      } else {
+        let cancelled = false;
+        let attempts = 0;
+        const poll = async () => {
+          if (cancelled) return;
+          const approved = await fetchAccess();
+          attempts++;
+          if (cancelled) return;
+          if (approved || attempts >= 10) return;
+          setTimeout(poll, 3000);
+        };
+        poll();
+      }
     } else {
-      let cancelled = false;
-      let attempts = 0;
-      const poll = async () => {
-        if (cancelled) return;
-        const d = await fetchDeal();
-        attempts++;
-        if (cancelled) return;
-        if (d && (d.payment_status === "paid" || d.payment_status === "failed")) return;
-        if (attempts < 10) setTimeout(poll, 3000);
-      };
-      poll();
+      if (!orderId) { setLoading(false); return; }
+      if (successParam === "true") {
+        const upd = supabase.from("deals").update({
+          payment_status: "paid",
+          escrow_status: "held",
+          status: "signed",
+        });
+        (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
+          .then(() => {
+            fetchDeal();
+            sessionStorage.removeItem("paymob_deal_id");
+          });
+      } else if (successParam === "false") {
+        const upd = supabase.from("deals").update({ payment_status: "failed" });
+        (isUuid ? upd.eq("id", orderId) : upd.eq("external_reference", orderId))
+          .then(() => fetchDeal());
+      } else {
+        let cancelled = false;
+        let attempts = 0;
+        const poll = async () => {
+          if (cancelled) return;
+          const d = await fetchDeal();
+          attempts++;
+          if (cancelled) return;
+          if (d && (d.payment_status === "paid" || d.payment_status === "failed")) return;
+          if (attempts < 10) setTimeout(poll, 3000);
+        };
+        poll();
+      }
     }
 
     const t = setTimeout(() => setShowFallback(true), 8000);
     return () => { clearTimeout(t); };
-  }, [orderId]);
+  }, [orderId, paymentType, user?.id, ideaId]);
 
   const handleManualCheck = async () => {
     setChecking(true);
-    await fetchDeal();
+    if (isDataRoom) await fetchAccess();
+    else await fetchDeal();
     setChecking(false);
   };
 
-  const success = deal?.payment_status === "paid";
-  const failed = deal?.payment_status === "failed";
+  const success = isDataRoom ? accessVerified : deal?.payment_status === "paid";
+  const failed = !isDataRoom && deal?.payment_status === "failed";
 
-  // Auto-redirect to the signed contract once payment is confirmed paid.
   useEffect(() => {
-    if (success && deal?.id) {
-      const t = setTimeout(() => navigate(`/contract/${deal.id}`), 1800);
-      return () => clearTimeout(t);
+    if (success) {
+      if (isDataRoom && ideaId) {
+        const redirectPath = userRole === "admin" ? "/admin" : `/idea/${ideaId}`;
+        const t = setTimeout(() => navigate(redirectPath), 1400);
+        return () => clearTimeout(t);
+      }
+      if (!isDataRoom && deal?.id) {
+        const t = setTimeout(() => navigate(`/contract/${deal.id}`), 1800);
+        return () => clearTimeout(t);
+      }
     }
-  }, [success, deal?.id, navigate]);
+  }, [success, deal?.id, ideaId, userRole, navigate]);
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-xl text-center" dir={isAr ? "rtl" : "ltr"}>
@@ -102,12 +147,16 @@ export default function PaymentResult() {
             <>
               <CheckCircle2 className="h-16 w-16 mx-auto text-green-600 mb-4" />
               <h1 className="text-2xl font-bold mb-2">
-                {isAr ? "تم الدفع بنجاح" : "Payment Successful"}
+                {isAr ? "تم الدفع بنجاح" : isDataRoom ? "Access Unlocked" : "Payment Successful"}
               </h1>
               <p className="text-muted-foreground mb-6">
                 {isAr
-                  ? "تم تسجيل استثمارك بنجاح. يمكنك الآن عرض العقد."
-                  : "Your investment has been recorded. You can now view the contract."}
+                  ? isDataRoom
+                    ? "تم تفعيل وصولك إلى غرفة البيانات. سيتم إعادة توجيهك الآن إلى الفكرة." 
+                    : "تم تسجيل استثمارك بنجاح. يمكنك الآن عرض العقد."
+                  : isDataRoom
+                    ? "Your secure data room access is granted. You will be redirected back to the idea." 
+                    : "Your investment has been recorded. You can now view the contract."}
               </p>
             </>
           ) : failed ? (
@@ -150,7 +199,12 @@ export default function PaymentResult() {
           )}
 
           <div className="flex gap-3 justify-center flex-wrap mt-4">
-            {success && deal?.id && (
+            {success && isDataRoom && ideaId && (
+              <Button onClick={() => navigate(`/idea/${ideaId}`)}>
+                {isAr ? "العودة إلى الفكرة" : "Back to Idea"}
+              </Button>
+            )}
+            {success && !isDataRoom && deal?.id && (
               <Button onClick={() => navigate(`/contract/${deal.id}`)}>
                 {isAr ? "عرض العقد" : "View Contract"}
               </Button>

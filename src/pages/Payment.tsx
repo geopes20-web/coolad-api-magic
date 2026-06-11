@@ -10,12 +10,16 @@ export default function Payment() {
   const { language } = useLanguage();
   const isAr = language === "ar";
   const iframeUrl = params.get("iframe");
+  const paymentType = params.get("payment_type");
+  const ideaId = params.get("idea_id");
   const [iframeReady, setIframeReady] = useState(false);
   const valid = !!iframeUrl && /^https:\/\/accept\.paymob\.com\//i.test(iframeUrl);
 
   useEffect(() => {
     if (dealId) sessionStorage.setItem("paymob_deal_id", dealId);
-  }, [dealId]);
+    if (paymentType) sessionStorage.setItem("paymob_payment_type", paymentType);
+    if (ideaId) sessionStorage.setItem("paymob_idea_id", ideaId);
+  }, [dealId, paymentType, ideaId]);
 
   // Listen for Paymob postMessage events (redirect after card capture)
   useEffect(() => {
@@ -24,17 +28,30 @@ export default function Payment() {
       if (!data) return;
       if (typeof data === "string" && data.includes("redirection_url")) return;
       if (data.redirection_url) {
-        navigate(`/payment-result?merchant_order_id=${dealId || ""}&success=true`);
+        const params = new URLSearchParams({
+          success: "true",
+        });
+        if (dealId) params.set("merchant_order_id", dealId);
+        if (paymentType) params.set("payment_type", paymentType);
+        if (ideaId) params.set("idea_id", ideaId);
+        navigate(`/payment-result?${params.toString()}`);
         return;
       }
       if (data.type === "PAYMOB_RESPONSE" || (event.origin || "").includes("paymob")) {
         const ok = data.success === true || data.success === "true";
-        navigate(`/payment-result?merchant_order_id=${data.merchant_order_id || dealId || ""}&success=${ok ? "true" : "false"}`);
+        const params = new URLSearchParams({
+          success: ok ? "true" : "false",
+        });
+        if (data.merchant_order_id) params.set("merchant_order_id", String(data.merchant_order_id));
+        else if (dealId) params.set("merchant_order_id", dealId);
+        if (paymentType) params.set("payment_type", paymentType);
+        if (ideaId) params.set("idea_id", ideaId);
+        navigate(`/payment-result?${params.toString()}`);
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [dealId, navigate]);
+  }, [dealId, paymentType, ideaId, navigate]);
 
   if (!valid) {
     return (
