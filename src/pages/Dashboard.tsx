@@ -12,6 +12,7 @@ import {
   Loader2, Rocket, DollarSign, Compass, Lightbulb, TrendingUp,
   MessageSquare, Bookmark, ArrowRight, Plus, Sparkles, BarChart3,
   CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw, Pencil, Trash2,
+  Globe, EyeOff,
 } from "lucide-react";
 
 interface IdeaRow {
@@ -147,9 +148,9 @@ export default function Dashboard() {
       {dataLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
-        <Tabs defaultValue={myIdeas.length > 0 ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
+        <Tabs defaultValue={userRole === "entrepreneur" || myIdeas.length > 0 ? "ideas" : "saved"} className="glass rounded-2xl shadow-glass overflow-hidden">
           <TabsList className="w-full justify-start bg-muted/50 rounded-none border-b border-border/50 px-4 flex-wrap">
-            {myIdeas.length > 0 && (
+            {(myIdeas.length > 0 || userRole === "entrepreneur") && (
               <TabsTrigger value="ideas"><Lightbulb className="h-4 w-4 me-1" />{t.dashboard.myIdeas}</TabsTrigger>
             )}
             <TabsTrigger value="saved"><Bookmark className="h-4 w-4 me-1" />{t.dashboard.savedIdeas}</TabsTrigger>
@@ -157,7 +158,7 @@ export default function Dashboard() {
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 me-1" />{t.dashboard.messages}</TabsTrigger>
           </TabsList>
 
-          {myIdeas.length > 0 && (
+          {(myIdeas.length > 0 || userRole === "entrepreneur") && (
             <TabsContent value="ideas" className="p-6">
               {myIdeas.length === 0 ? (
                 <div className="text-center py-12">
@@ -190,7 +191,40 @@ export default function Dashboard() {
                             <TrendingUp className="h-3.5 w-3.5 text-primary" />
                             <span className="font-semibold text-foreground">{idea.ai_score}</span>
                           </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {idea.status === "published" ? (
+                              <span className="text-primary flex items-center gap-0.5"><Globe className="h-3 w-3" /> Live</span>
+                            ) : (
+                              <span className="text-yellow-500 flex items-center gap-0.5"><EyeOff className="h-3 w-3" /> Draft</span>
+                            )}
+                          </div>
                         </div>
+                        {/* Publish/Unpublish toggle */}
+                        {idea.decision === "accepted" && idea.status !== "published" && (
+                          <Button size="sm" variant="outline"
+                            className="text-primary border-primary/30 text-xs h-7 px-2"
+                            onClick={async () => {
+                              const { error } = await supabase.from("ideas").update({ status: "published" }).eq("id", idea.id);
+                              if (!error) {
+                                setMyIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: "published" } : i));
+                                toast({ title: "Published!", description: "Your idea is now visible in the Marketplace." });
+                              } else {
+                                toast({ title: "Error", description: error.message, variant: "destructive" });
+                              }
+                            }}>
+                            <Globe className="h-3 w-3 me-1" />Publish
+                          </Button>
+                        )}
+                        {idea.status === "published" && (
+                          <Button size="sm" variant="outline"
+                            className="text-yellow-600 border-yellow-500/30 text-xs h-7 px-2"
+                            onClick={async () => {
+                              const { error } = await supabase.from("ideas").update({ status: "draft" }).eq("id", idea.id);
+                              if (!error) setMyIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: "draft" } : i));
+                            }}>
+                            <EyeOff className="h-3 w-3 me-1" />Unpublish
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit"
                           onClick={() => navigate(`/submit?edit=${idea.id}`)}>
                           <Pencil className="h-4 w-4" />

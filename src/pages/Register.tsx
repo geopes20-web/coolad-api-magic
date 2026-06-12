@@ -91,27 +91,43 @@ export default function Register() {
       password,
       options: {
         data: { full_name: fullName, phone_number: phone.trim() },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/dashboard`,
       },
     });
 
     if (error) {
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
+      setLoading(false);
       return;
     }
 
+    // Insert role if user was created
     if (data.user) {
-      await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+      await supabase.from("user_roles").upsert(
+        { user_id: data.user.id, role },
+        { onConflict: "user_id" }
+      );
     }
 
     setLoading(false);
-    toast({
-      title: t.common.success,
-      description: isAr
-        ? "تم إنشاء الحساب! الخطوة التالية: تأكيد رقم الهاتف"
-        : "Account created! Next: verify your phone",
-    });
-    navigate("/verify-phone");
+
+    // If session exists → email confirmation is disabled (dev mode) → go straight to dashboard
+    if (data.session) {
+      toast({
+        title: t.common.success,
+        description: isAr ? "تم إنشاء الحساب بنجاح!" : "Account created successfully!",
+      });
+      navigate("/dashboard");
+    } else {
+      // Email confirmation required
+      toast({
+        title: isAr ? "تحقق من بريدك الإلكتروني" : "Check your email",
+        description: isAr
+          ? `تم إرسال رابط التأكيد إلى ${email}. بعد التأكيد يمكنك تسجيل الدخول.`
+          : `A confirmation link was sent to ${email}. Click it, then log in.`,
+      });
+      navigate("/login");
+    }
   };
 
   return (
