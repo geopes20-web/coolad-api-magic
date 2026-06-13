@@ -7,7 +7,8 @@ import { Loader2, Download, ArrowLeft, FileSignature, ShieldCheck } from "lucide
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/i18n/LanguageContext"; 
 
-type Profile = { id: string; full_name: string; avatar_url: string | null; email?: string };
+type Profile = { id: string; full_name: string; avatar_url: string | null; email?: string; phone_number?: string | null };
+type KycData = { full_legal_name: string | null; national_id: string | null; date_of_birth: string | null; status: string };
 type Deal = {
   id: string;
   idea_id: string;
@@ -33,6 +34,8 @@ export default function Contract() {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [founder, setFounder] = useState<Profile | null>(null);
   const [investor, setInvestor] = useState<Profile | null>(null);
+  const [founderKyc, setFounderKyc] = useState<KycData | null>(null);
+  const [investorKyc, setInvestorKyc] = useState<KycData | null>(null);
   const [ideaTitle, setIdeaTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [signingLoading, setSigningLoading] = useState(false);
@@ -50,15 +53,19 @@ export default function Contract() {
       if (!d) { setLoading(false); return; }
       setDeal(d as Deal);
 
-      // هنا تم إزالة حقل الـ email من الـ select لحل مشكلة الـ Type casting والـ Error تماماً
-      const [{ data: f }, { data: i }, { data: idea }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, avatar_url").eq("id", d.founder_id).maybeSingle(),
-        supabase.from("profiles").select("id, full_name, avatar_url").eq("id", d.investor_id).maybeSingle(),
+      // Fetch profiles (with phone), idea title, and KYC data for both parties
+      const [{ data: f }, { data: i }, { data: idea }, { data: fKyc }, { data: iKyc }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, avatar_url, phone_number").eq("id", d.founder_id).maybeSingle(),
+        supabase.from("profiles").select("id, full_name, avatar_url, phone_number").eq("id", d.investor_id).maybeSingle(),
         supabase.from("ideas").select("title").eq("id", d.idea_id).maybeSingle(),
+        supabase.from("kyc_verifications").select("full_legal_name, national_id, date_of_birth, status").eq("user_id", d.founder_id).eq("status", "approved").maybeSingle(),
+        supabase.from("kyc_verifications").select("full_legal_name, national_id, date_of_birth, status").eq("user_id", d.investor_id).eq("status", "approved").maybeSingle(),
       ]);
       
       setFounder(f as Profile); 
       setInvestor(i as Profile); 
+      setFounderKyc(fKyc as KycData | null);
+      setInvestorKyc(iKyc as KycData | null);
       setIdeaTitle(idea?.title || "");
       setLoading(false);
     })();
@@ -125,6 +132,9 @@ export default function Contract() {
       p1: "الطرف الأول (المستثمر):",
       p2: "الطرف الثاني (صاحب الفكرة والمشروع):",
       name: "الاسم الكامل",
+      legalName: "الاسم القانوني الرسمي (KYC)",
+      phone: "رقم الهاتف",
+      nationalId: "رقم البطاقة الوطنية",
       email: "البريد الإلكتروني",
       details: "تفاصيل وبنود الاستثمار الحاكمة للمنصة:",
       amount: "مبلغ التمويل المالي",
@@ -157,6 +167,9 @@ export default function Contract() {
       p1: "First Party (Investor):",
       p2: "Second Party (Founder / Project Owner):",
       name: "Full Name",
+      legalName: "Legal Name (KYC Verified)",
+      phone: "Phone Number",
+      nationalId: "National ID Number",
       email: "Email Address",
       details: "Governing Investment Infrastructure Details:",
       amount: "Total Investment Capital",
@@ -240,14 +253,40 @@ export default function Contract() {
           <p className="text-sm font-bold mb-6">{t.project}: <span className="underline font-normal text-slate-800">{ideaTitle}</span></p>
 
           <div className="grid grid-cols-2 gap-6 mb-8">
-            <div className="border border-slate-300 p-4 bg-slate-50/50">
-              <h3 className="text-sm font-black border-b border-slate-300 pb-2 mb-3">{t.p1}</h3>
-              <p className="text-sm mb-1"><strong>{t.name}:</strong> {investor?.full_name || "—"}</p>
+            {/* Investor Card */}
+            <div className="border border-slate-300 p-4 bg-slate-50/50 space-y-1.5">
+              <h3 className="text-sm font-black border-b border-slate-300 pb-2 mb-3 flex items-center gap-2">
+                {t.p1}
+                {investorKyc && <span className="text-[9px] bg-emerald-100 text-emerald-700 border border-emerald-300 px-1.5 py-0.5 font-bold uppercase tracking-wider">KYC ✓</span>}
+              </h3>
+              <p className="text-sm"><strong>{t.name}:</strong> {investor?.full_name || "—"}</p>
+              {investorKyc?.full_legal_name && (
+                <p className="text-sm"><strong>{t.legalName}:</strong> <span className="font-mono">{investorKyc.full_legal_name}</span></p>
+              )}
+              {investorKyc?.national_id && (
+                <p className="text-sm"><strong>{t.nationalId}:</strong> <span className="font-mono tracking-widest">{investorKyc.national_id}</span></p>
+              )}
+              {investor?.phone_number && (
+                <p className="text-sm"><strong>{t.phone}:</strong> <span className="font-mono">{investor.phone_number}</span></p>
+              )}
               <p className="text-sm"><strong>{t.email}:</strong> {investorEmail}</p>
             </div>
-            <div className="border border-slate-300 p-4 bg-slate-50/50">
-              <h3 className="text-sm font-black border-b border-slate-300 pb-2 mb-3">{t.p2}</h3>
-              <p className="text-sm mb-1"><strong>{t.name}:</strong> {founder?.full_name || "—"}</p>
+            {/* Founder Card */}
+            <div className="border border-slate-300 p-4 bg-slate-50/50 space-y-1.5">
+              <h3 className="text-sm font-black border-b border-slate-300 pb-2 mb-3 flex items-center gap-2">
+                {t.p2}
+                {founderKyc && <span className="text-[9px] bg-emerald-100 text-emerald-700 border border-emerald-300 px-1.5 py-0.5 font-bold uppercase tracking-wider">KYC ✓</span>}
+              </h3>
+              <p className="text-sm"><strong>{t.name}:</strong> {founder?.full_name || "—"}</p>
+              {founderKyc?.full_legal_name && (
+                <p className="text-sm"><strong>{t.legalName}:</strong> <span className="font-mono">{founderKyc.full_legal_name}</span></p>
+              )}
+              {founderKyc?.national_id && (
+                <p className="text-sm"><strong>{t.nationalId}:</strong> <span className="font-mono tracking-widest">{founderKyc.national_id}</span></p>
+              )}
+              {founder?.phone_number && (
+                <p className="text-sm"><strong>{t.phone}:</strong> <span className="font-mono">{founder.phone_number}</span></p>
+              )}
               <p className="text-sm"><strong>{t.email}:</strong> {founderEmail}</p>
             </div>
           </div>

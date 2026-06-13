@@ -12,7 +12,7 @@ import {
   Loader2, Rocket, DollarSign, Compass, Lightbulb, TrendingUp,
   MessageSquare, Bookmark, ArrowRight, Plus, Sparkles, BarChart3,
   CheckCircle, AlertTriangle, XCircle, Lock, RotateCcw, Pencil, Trash2,
-  Globe, EyeOff,
+  Globe, EyeOff, Wallet, CheckCircle2, Clock,
 } from "lucide-react";
 
 interface IdeaRow {
@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [savedIdeas, setSavedIdeas] = useState<SavedRow[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequestRow[]>([]);
   const [recentMessages, setRecentMessages] = useState<MessageRow[]>([]);
+  const [founderDeals, setFounderDeals] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
@@ -59,6 +60,18 @@ export default function Dashboard() {
           .eq("founder_id", user.id).order("created_at", { ascending: false })
           .then(({ data }) => { setMyIdeas((data as unknown as IdeaRow[]) || []); }) as unknown as Promise<void>
       );
+
+      // Fetch founder's paid deals (to show payout status)
+      if (userRole === "entrepreneur" || !userRole) {
+        promises.push(
+          supabase.from("deals")
+            .select("id, idea_id, investment_amount_usd, payment_status, status, notes, created_at")
+            .eq("founder_id", user.id)
+            .eq("payment_status", "paid")
+            .order("created_at", { ascending: false })
+            .then(({ data }) => { setFounderDeals(data || []); }) as unknown as Promise<void>
+        );
+      }
 
       // Always load saved ideas
       promises.push(
@@ -144,6 +157,91 @@ export default function Dashboard() {
           )}
         </div>
       </motion.div>
+
+      {/* Founder Payout Summary — visible only when there are paid deals */}
+      {userRole === "entrepreneur" && founderDeals.length > 0 && (() => {
+        const allPayouts = founderDeals.flatMap(d => {
+          let p: any[] = [];
+          try { p = d.notes ? JSON.parse(d.notes) : []; } catch { p = []; }
+          return Array.isArray(p) ? p : [];
+        });
+        const totalEntitlement = founderDeals.reduce((s, d) => s + d.investment_amount_usd * 0.9, 0);
+        const totalReceived = allPayouts.reduce((s, p) => s + (p.amount || 0), 0);
+        const remaining = Math.max(0, totalEntitlement - totalReceived);
+        return (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="glass rounded-2xl p-5 shadow-glass mb-6 border border-blue-500/20 bg-blue-500/5">
+            <div className="flex items-center gap-2 mb-4">
+              <Wallet className="h-5 w-5 text-blue-500" />
+              <h2 className="font-bold text-foreground text-sm">
+                {t?.dashboard?.myPayouts || "مستحقاتي من الصفقات"}
+              </h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center">
+                <p className="text-lg font-black text-foreground">${Number(totalEntitlement).toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground">إجمالي مستحقاتي (90%)</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-black text-emerald-600">${Number(totalReceived).toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground">وصلني حتى الآن</p>
+              </div>
+              <div className="text-center">
+                <p className={`text-lg font-black ${remaining > 0 ? 'text-orange-500' : 'text-emerald-600'}`}>${Number(remaining).toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground">{remaining > 0 ? 'متبقي لم يصلني' : 'مكتمل ✅'}</p>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="mb-3">
+              <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                <span>التقدم</span>
+                <span>{totalEntitlement > 0 ? Math.round((totalReceived / totalEntitlement) * 100) : 0}%</span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div className="bg-blue-500 h-2 rounded-full transition-all"
+                  style={{ width: `${totalEntitlement > 0 ? Math.min(100, (totalReceived / totalEntitlement) * 100) : 0}%` }} />
+              </div>
+            </div>
+            {/* Per-deal breakdown */}
+            {founderDeals.map(d => {
+              let payouts: any[] = [];
+              try { payouts = d.notes ? JSON.parse(d.notes) : []; } catch { payouts = []; }
+              const dealReceived = payouts.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+              const dealRemaining = Math.max(0, d.investment_amount_usd * 0.9 - dealReceived);
+              return (
+                <div key={d.id} className="border border-border/30 rounded-xl p-3 mb-2 bg-background/40">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-foreground">
+                      صفقة ${Number(d.investment_amount_usd).toLocaleString()}
+                    </span>
+                    {dealRemaining === 0
+                      ? <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> مكتمل</span>
+                      : <span className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><Clock className="h-3 w-3" /> متبقي ${Number(dealRemaining).toLocaleString()}</span>
+                    }
+                  </div>
+                  {payouts.length === 0 ? (
+                    <p className="text-[11px] text-amber-500">⏳ لم تصلك أي دفعة بعد — قيد المعالجة من الفريق</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {payouts.map((p: any, i: number) => (
+                        <div key={p.id || i} className="flex justify-between text-[11px] text-muted-foreground">
+                          <span className="text-emerald-600 font-bold">✓ ${Number(p.amount).toLocaleString()} <span className="text-muted-foreground font-normal">via {p.method}</span></span>
+                          <span>{new Date(p.date).toLocaleDateString("ar-EG")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {remaining > 0 && (
+              <p className="text-[11px] text-muted-foreground text-center mt-1 italic">
+                سيتم تحويل المبالغ المتبقية على دفعات. تواصل مع الفريق لأي استفسار.
+              </p>
+            )}
+          </motion.div>
+        );
+      })()}
 
       {dataLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>

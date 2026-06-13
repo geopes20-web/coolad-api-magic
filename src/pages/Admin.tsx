@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Shield, Users as UsersIcon, FileCheck, Lightbulb, Eye, Check, X,
-  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus, BookOpen
+  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus, BookOpen, SendHorizonal
 } from "lucide-react";
 
 type KycRow = {
@@ -28,7 +28,7 @@ type KycRow = {
 };
 type ProfileFull = { id: string; full_name: string; phone_number: string | null; created_at: string; is_blocked?: boolean; blocked_reason?: string | null };
 type IdeaRow = { id: string; title: string; sector: string; status: string; ai_score: number | null; founder_id: string; created_at: string; listing_type?: string | null };
-type DealRow = { id: string; idea_id: string; investment_amount_usd: number; platform_fee_amount: number | null; payment_status: string; escrow_status: string | null; status: string; created_at: string };
+type DealRow = { id: string; idea_id: string; investment_amount_usd: number; platform_fee_amount: number | null; payment_status: string; escrow_status: string | null; status: string; created_at: string; notes: string | null };
 type PaymentEvent = { id: string; deal_id: string | null; provider: string; external_reference: string | null; amount_usd: number | null; currency: string | null; status: string; event_type: string; created_at: string; raw_payload: any };
 type ReportRow = { id: string; target_type: string; target_id: string; reason: string; details: string | null; status: string; created_at: string };
 type AccessRow = { id: string; idea_id: string; investor_id: string; founder_id: string; status: string; payment_status?: string; data_room_fee_usd?: number; created_at: string; message?: string | null; ideas?: { title: string } | null };
@@ -56,6 +56,12 @@ export default function Admin() {
   const [newAdminName, setNewAdminName] = useState("");
   const [creatingAdmin, setCreatingAdmin] = useState(false);
 
+  // Payout state — amount + method only (simple & real)
+  const [payoutDialogDealId, setPayoutDialogDealId] = useState<string | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [payoutMethod, setPayoutMethod] = useState("paymob");
+  const [payoutLoading, setPayoutLoading] = useState(false);
+
   const isAdmin = userRole === "admin";
 
   const loadAll = async () => {
@@ -65,9 +71,11 @@ export default function Admin() {
       supabase.from("kyc_verifications").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id,full_name,phone_number,created_at,is_blocked,blocked_reason").order("created_at", { ascending: false }),
       supabase.from("ideas").select("id,title,sector,status,ai_score,founder_id,created_at,listing_type").order("created_at", { ascending: false }),
-      supabase.from("deals").select("id,idea_id,investment_amount_usd,platform_fee_amount,payment_status,escrow_status,status,created_at").order("created_at", { ascending: false }),
+      supabase.from("deals").select("id,idea_id,investment_amount_usd,platform_fee_amount,payment_status,escrow_status,status,created_at,notes").order("created_at", { ascending: false }),
       supabase.from("reports").select("id,target_type,target_id,reason,details,status,created_at").order("created_at", { ascending: false }),
-      (supabase as any).from("access_requests").select("id,idea_id,investor_id,founder_id,status,payment_status,data_room_fee_usd,message,created_at,ideas(title)").order("created_at", { ascending: false }),
+      // access_requests: fetch without join to avoid 400 error — idea titles resolved from ideas array
+      (supabase as any).from("access_requests").select("id,idea_id,investor_id,founder_id,status,payment_status,data_room_fee_usd,message,created_at").order("created_at", { ascending: false }),
+      // payment_events: read-only for transfers tab (RLS allows SELECT for admin)
       supabase.from("payment_events").select("*").order("created_at", { ascending: false }).limit(200),
     ]);
     setStats((s.data as Stats) || {});
@@ -76,8 +84,12 @@ export default function Admin() {
     setIdeas((i.data as IdeaRow[]) || []);
     setDeals((d.data as DealRow[]) || []);
     setReports((r.data as ReportRow[]) || []);
-    setAccessRequests((a.data as AccessRow[]) || []);
-    setPaymentEvents((pe.data as PaymentEvent[]) || []);
+    // Enrich access_requests with idea titles from the already-fetched ideas list
+    const rawAccess = (a.data as any[]) || [];
+    const ideaTitleMap = Object.fromEntries(((i.data as IdeaRow[]) || []).map(x => [x.id, x.title]));
+    setAccessRequests(rawAccess.map(x => ({ ...x, ideas: x.idea_id ? { title: ideaTitleMap[x.idea_id] || x.idea_id } : null })) as AccessRow[]);
+    // payment_events: only set if SELECT succeeded (ignore 403 gracefully)
+    if (!pe.error) setPaymentEvents((pe.data as PaymentEvent[]) || []);
     setLoading(false);
   };
 
@@ -87,10 +99,62 @@ export default function Admin() {
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-  // 1. تصحيح احتساب الخزينة: الفلترة هنا تضمن جمع العمليات الناجحة والمكتملة نقديًا فقط (حالتها paid و completed)
+  // Treasury: sum fees from ALL paid deals (status = "signed" OR "completed" — both are post-payment states)
   const totalPlatformFeesCollected = deals
-    .filter(d => d.payment_status === "paid" && d.status === "completed")
+    .filter(d => d.payment_status === "paid" && (d.status === "signed" || d.status === "completed"))
     .reduce((sum, d) => sum + (d.investment_amount_usd * 0.10), 0);
+
+  // Total investment held (90% = what founders should receive after fee deduction)
+  const totalInvestmentHeld = deals
+    .filter(d => d.payment_status === "paid" && d.status === "signed")
+    .reduce((sum, d) => sum + (d.investment_amount_usd * 0.90), 0);
+
+  const markDealCompleted = async (dealId: string) => {
+    const { error } = await supabase.from("deals").update({ status: "completed" }).eq("id", dealId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: isAr ? "تم تحديث الصفقة" : "Deal marked as completed" }); loadAll(); }
+  };
+
+  // ---------------------------------------------------------------------------
+  // logFounderPayout: saves payout in deals.notes as JSON array.
+  // ✅ REAL: calls supabase UPDATE on deals (admin can always update deals).
+  // ✅ FIX: updates local state directly so payout appears immediately.
+  // ---------------------------------------------------------------------------
+  const logFounderPayout = async () => {
+    const amt = parseFloat(payoutAmount);
+    if (!payoutDialogDealId || isNaN(amt) || amt <= 0) {
+      toast({ title: "Error", description: isAr ? "أدخل مبلغاً صحيحاً" : "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    setPayoutLoading(true);
+    const deal = deals.find(d => d.id === payoutDialogDealId);
+    let existing: any[] = [];
+    try { existing = deal?.notes ? JSON.parse(deal.notes) : []; } catch { existing = []; }
+    if (!Array.isArray(existing)) existing = [];
+    const newPayout = {
+      id: Date.now().toString(), // simple unique id
+      amount: amt,
+      method: payoutMethod,
+      date: new Date().toISOString(),
+    };
+    const updated = [...existing, newPayout];
+    const notesJson = JSON.stringify(updated);
+    const { error } = await supabase.from("deals").update({ notes: notesJson }).eq("id", payoutDialogDealId);
+    setPayoutLoading(false);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    // ✅ Update local state DIRECTLY so user sees payout immediately (no page reload)
+    setDeals(prev => prev.map(d => d.id === payoutDialogDealId ? { ...d, notes: notesJson } : d));
+    toast({ title: isAr ? "✅ تم تسجيل الدفعة" : "✅ Payout saved" });
+    setPayoutDialogDealId(null);
+    setPayoutAmount(""); setPayoutMethod("paymob");
+    // Auto-complete deal if fully paid
+    const totalPaid = updated.reduce((s, p) => s + (p.amount || 0), 0);
+    if (deal && totalPaid >= deal.investment_amount_usd * 0.90) {
+      await supabase.from("deals").update({ status: "completed" }).eq("id", payoutDialogDealId);
+      setDeals(prev => prev.map(d => d.id === payoutDialogDealId ? { ...d, status: "completed" } : d));
+      toast({ title: isAr ? "✅ تمت الصفقة بالكامل" : "✅ Deal fully paid out — marked completed" });
+    }
+  };
 
   const approveKyc = async (id: string) => {
     const { error } = await supabase.from("kyc_verifications").update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString(), rejection_reason: null }).eq("id", id);
@@ -201,54 +265,149 @@ export default function Admin() {
             <TabsContent value="access" className="space-y-2">{accessRequests.map(a => <Row key={a.id} title={a.ideas?.title || a.idea_id} sub={`Fee $${a.data_room_fee_usd ?? 5} · ${a.payment_status || "unpaid"}`} status={a.status}><Button size="sm" variant="outline" onClick={() => updateAccess(a.id, "rejected")}><X className="h-4 w-4" /></Button><Button size="sm" onClick={() => updateAccess(a.id, "approved")} className="gradient-primary border-0 text-primary-foreground"><Check className="h-4 w-4" /></Button></Row>)}</TabsContent>
 
             <TabsContent value="payments" className="space-y-3">
-              <div className="glass rounded-xl p-4 mb-4 border border-emerald-500/20 bg-emerald-500/5">
-                <h3 className="text-sm font-bold text-foreground mb-1">{isAr ? "ملخص الخزينة الاستثمارية المعتمدة" : "Verified Treasury Summary"}</h3>
-                <p className="text-2xl font-black text-emerald-600">${Number(totalPlatformFeesCollected).toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">{isAr ? "إجمالي الرسوم المستقطعة والمؤمنة نقديًا بحسابات المنصة" : "Total fees audited and securely stored inside system escrow"}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div className="glass rounded-xl p-4 border border-emerald-500/20 bg-emerald-500/5">
+                  <h3 className="text-sm font-bold text-foreground mb-1">{isAr ? "ملخص الخزينة الاستثمارية المعتمدة" : "Verified Treasury Summary"}</h3>
+                  <p className="text-2xl font-black text-emerald-600">${Number(totalPlatformFeesCollected).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{isAr ? "إجمالي رسوم المنصة (10%) من الصفقات المدفوعة" : "Total platform fees (10%) from all paid deals"}</p>
+                </div>
+                <div className="glass rounded-xl p-4 border border-blue-500/20 bg-blue-500/5">
+                  <h3 className="text-sm font-bold text-foreground mb-1">{isAr ? "مستحقات أصحاب الأفكار (في الانتظار)" : "Pending Founder Payouts (90%)"}</h3>
+                  <p className="text-2xl font-black text-blue-500">${Number(totalInvestmentHeld).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{isAr ? "المبالغ المحتجزة التي لم يتم تحويلها بعد لأصحاب الأفكار" : "Funds held in your Paymob account — click \"Release\" per deal to mark as paid out to founder"}</p>
+                </div>
               </div>
               
               {deals.length === 0 ? (
                 <p className="text-sm text-muted-foreground p-4 text-center">{isAr ? "لا توجد عمليات ماليّة بعد" : "No deals logged yet"}</p>
               ) : (
                 deals.map(d => {
-                  // 2. تصحيح احتساب النسبة لكل صفحة: ضرب النسبة الحية 10% مباشرة لتطهير مخلفات البيانات التجريبية القديمة
                   const currentFee = d.investment_amount_usd * 0.10;
+                  const founderEntitlement = d.investment_amount_usd * 0.90;
                   const relatedIdea = ideas.find(i => i.id === d.idea_id);
+                  // Read payout history from deals.notes JSON
+                  let dealPayouts: any[] = [];
+                  try { dealPayouts = d.notes ? JSON.parse(d.notes) : []; } catch { dealPayouts = []; }
+                  if (!Array.isArray(dealPayouts)) dealPayouts = [];
+                  const paidOut = dealPayouts.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                  const remaining = Math.max(0, founderEntitlement - paidOut);
+                  const paidPct = founderEntitlement > 0 ? Math.min(100, (paidOut / founderEntitlement) * 100) : 0;
+                  const isPaid = d.payment_status === "paid";
+
                   return (
-                    <div key={d.id} className="glass rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-border/40">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="font-bold text-base text-foreground flex items-center gap-2">
-                          <span>${Number(d.investment_amount_usd).toLocaleString()}</span>
-                          <Badge variant="secondary" className="text-[10px] uppercase font-mono">{d.status}</Badge>
+                    <div key={d.id} className="glass rounded-xl border border-border/40 overflow-hidden">
+                      {/* Deal Summary Row */}
+                      <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="font-bold text-base text-foreground flex items-center gap-2">
+                            <span>${Number(d.investment_amount_usd).toLocaleString()}</span>
+                            <Badge variant="secondary" className="text-[10px] uppercase font-mono">{d.status}</Badge>
+                            {!isPaid && <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40">unpaid</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {isAr ? "المشروع: " : "Project: "}<span className="text-foreground">{relatedIdea?.title || d.idea_id}</span>
+                          </p>
+                          <div className="text-[11px] text-muted-foreground flex items-center gap-3 font-mono">
+                            <div>Escrow: <span className="text-amber-500 font-bold">{d.escrow_status || "none"}</span></div>
+                            <div>Payment: <span className="font-bold">{d.payment_status}</span></div>
+                            <div>{new Date(d.created_at).toLocaleDateString()}</div>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground font-medium truncate">
-                          {isAr ? "المشروع: " : "Project: "} <span className="text-foreground">{relatedIdea?.title || d.idea_id}</span>
-                        </p>
-                        <div className="text-[11px] text-muted-foreground flex items-center gap-3 font-mono">
-                          <div>Escrow: <span className="text-amber-500 font-bold">{d.escrow_status || "none"}</span></div>
-                          <div>Payment: <span className="font-bold text-slate-700">{d.payment_status || "unpaid"}</span></div>
-                          <div>Date: {new Date(d.created_at).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-2 md:pt-0">
-                        <div className="text-right">
-                          <span className="text-xs text-muted-foreground block">{isAr ? "عمولة المنصة (10%)" : "Platform Fee (10%)"}</span>
-                          <span className="font-black font-mono text-emerald-600 text-sm">${Number(currentFee).toLocaleString()}</span>
-                        </div>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right text-xs space-y-0.5">
+                            <div><span className="text-muted-foreground">{isAr ? "عمولة المنصة (10%)" : "Platform (10%)"}: </span><span className="font-black text-emerald-600">${Number(currentFee).toLocaleString()}</span></div>
+                            <div><span className="text-muted-foreground">{isAr ? "لل Founder (90%)" : "Founder (90%)"}: </span><span className="font-black text-blue-500">${Number(founderEntitlement).toLocaleString()}</span></div>
+                          </div>
                           <Link to={`/contract/${d.id}`}>
                             <Button size="sm" variant="outline" className="h-8">
-                              <FileCheck className="h-3.5 w-3.5 me-1" /> {isAr ? "العقد" : "Contract"}
-                            </Button>
-                          </Link>
-                          <Link to={`/idea/${d.idea_id}`}>
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                              <Eye className="h-4 w-4" />
+                              <FileCheck className="h-3.5 w-3.5 me-1" />{isAr ? "عقد" : "Contract"}
                             </Button>
                           </Link>
                         </div>
                       </div>
+
+                      {/* Payout section — only for paid deals */}
+                      {isPaid && (
+                        <div className="border-t border-border/40 bg-muted/30 p-4 space-y-3">
+                          {/* Progress bar */}
+                          <div className="flex justify-between text-[11px] mb-1">
+                            <span className="text-muted-foreground">{isAr ? "مدفوع لصاحب الفكرة" : "Paid to founder"}: <span className="font-bold text-foreground">${Number(paidOut).toLocaleString()}</span></span>
+                            <span className="font-bold">{Math.round(paidPct)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-1">
+                            <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {isAr ? "متبقي لصاحب الفكرة" : "Still owed to founder"}: <span className={`font-bold ${remaining > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>${Number(remaining).toLocaleString()}</span>
+                          </div>
+
+                          {/* Logged payouts list */}
+                          {dealPayouts.length > 0 && (
+                            <div className="space-y-1.5 pt-1">
+                              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{isAr ? "سجل الدفعات المسجلة" : "Logged Payouts"}</p>
+                              {dealPayouts.map((p: any, idx: number) => (
+                                <div key={p.id || idx} className="flex items-center justify-between text-xs bg-background/50 border border-border/30 rounded-lg px-3 py-2">
+                                  <span className="font-bold text-blue-600">#{idx + 1} · ${Number(p.amount).toLocaleString()} <span className="font-normal text-muted-foreground capitalize">via {p.method}</span></span>
+                                  <span className="text-muted-foreground">{new Date(p.date).toLocaleDateString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Log payout form (only if still remaining) */}
+                          {remaining > 0 && (
+                            payoutDialogDealId === d.id ? (
+                              <div className="border border-blue-400/30 rounded-xl p-3 bg-blue-500/5 space-y-2">
+                                <p className="text-xs font-bold text-foreground">
+                                  {isAr
+                                    ? `سجل دفعة حولتها يدوياً من Paymob (المتبقي: $${Number(remaining).toLocaleString()})`
+                                    : `Record a payout you manually sent from Paymob (remaining: $${Number(remaining).toLocaleString()})`
+                                  }
+                                </p>
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="number"
+                                    placeholder={`$${Number(remaining).toLocaleString()}`}
+                                    value={payoutAmount}
+                                    onChange={e => setPayoutAmount(e.target.value)}
+                                    className="h-8 text-sm flex-1"
+                                  />
+                                  <select
+                                    value={payoutMethod}
+                                    onChange={e => setPayoutMethod(e.target.value)}
+                                    className="h-8 text-sm border border-input rounded-md px-2 bg-background"
+                                  >
+                                    <option value="paymob">Paymob</option>
+                                    <option value="bank_transfer">{isAr ? "تحويل بنكي" : "Bank Transfer"}</option>
+                                    <option value="instapay">InstaPay</option>
+                                    <option value="vodafone_cash">Vodafone Cash</option>
+                                    <option value="cash">{isAr ? "كاش" : "Cash"}</option>
+                                  </select>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                  <Button size="sm" variant="outline" onClick={() => { setPayoutDialogDealId(null); setPayoutAmount(""); }}>{isAr ? "إلغاء" : "Cancel"}</Button>
+                                  <Button size="sm" onClick={logFounderPayout} disabled={payoutLoading} className="bg-blue-600 hover:bg-blue-700 text-white border-0">
+                                    {payoutLoading ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : <SendHorizonal className="h-3 w-3 me-1" />}
+                                    {isAr ? "تأكيد" : "Confirm"}
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full h-8 text-xs border-blue-400/40 text-blue-600 hover:bg-blue-50"
+                                onClick={() => setPayoutDialogDealId(d.id)}
+                              >
+                                + {isAr ? `سجل دفعة ($${Number(remaining).toLocaleString()} متبقي)` : `Record a payment to founder ($${Number(remaining).toLocaleString()} remaining)`}
+                              </Button>
+                            )
+                          )}
+                          {remaining === 0 && paidOut > 0 && (
+                            <p className="text-xs text-emerald-600 font-bold text-center">✅ {isAr ? "تم تحويل كامل مستحقات صاحب الفكرة" : "Founder fully paid out"}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
