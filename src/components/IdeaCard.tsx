@@ -38,21 +38,18 @@ export default function IdeaCard({
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-foreground text-lg truncate">{title}</h3>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-            <span>{t.marketplace.by} {founderName || "—"}</span>
+          <h3 className="font-bold text-foreground text-lg leading-tight truncate mb-1">{title}</h3>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground/80 truncate max-w-[160px]">{founderName || "—"}</span>
             {location && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {location}
-                </span>
-              </>
+              <span className="flex items-center gap-1 text-xs">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[100px]">{location}</span>
+              </span>
             )}
           </div>
         </div>
-        <Badge variant="secondary" className="shrink-0 ms-2">{sector}</Badge>
+        <Badge variant="secondary" className="shrink-0 ms-2 text-xs">{sector}</Badge>
       </div>
 
       <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">{description}</p>

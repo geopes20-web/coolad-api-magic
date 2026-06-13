@@ -12,7 +12,8 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, DollarSign, TrendingUp,
   Users, Shield, Target, Clock, MapPin, Loader2, Sparkles, BarChart3,
-  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle, FileText, FolderLock
+  Lock, CheckCircle, AlertTriangle, XCircle, MessageCircle, FileText, FolderLock,
+  CreditCard, X, ExternalLink
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -29,6 +30,58 @@ interface IdeaData {
   [key: string]: unknown;
 }
 
+interface DataRoomAccess {
+  status: string;
+  payment_reference?: string;
+}
+
+// ── Payment Modal ────────────────────────────────────────────────────────────
+function PaymentModal({
+  iframeUrl,
+  onClose,
+}: {
+  iframeUrl: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            <span className="font-semibold text-foreground">Secure Payment — Powered by Paymob</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center gap-3 p-4">
+          <p className="text-xs text-muted-foreground">
+            You'll be redirected to Paymob's secure payment page.
+          </p>
+          <a
+            href={iframeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full"
+          >
+            <Button className="w-full gradient-primary border-0 text-primary-foreground h-11 font-semibold">
+              <ExternalLink className="h-4 w-4 me-2" />
+              Open Paymob Checkout
+            </Button>
+          </a>
+          <p className="text-xs text-muted-foreground text-center leading-relaxed">
+            After payment completes, return here and refresh to see your Data Room access.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
@@ -38,11 +91,12 @@ export default function IdeaDetail() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [accessStatus, setAccessStatus] = useState<string | null>(null);
+  const [dataRoomAccess, setDataRoomAccess] = useState<DataRoomAccess | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [signedNda, setSignedNda] = useState(false);
-  const [hasDataRoomAccess, setHasDataRoomAccess] = useState(false);
+  const [paymentModal, setPaymentModal] = useState<string | null>(null); // iframe URL
 
-  // دالة ذكية لتنظيف الأرقام ومنع ظهور الـ NaN في واجهتك الأصلية
+  // دالة ذكية لتنظيف الأرقام ومنع ظهور الـ NaN
   const cleanAndFormatNumber = (val: string | null | undefined, fallback = "0") => {
     if (!val) return fallback;
     const cleanStr = val.replace(/[^\d.]/g, "");
@@ -57,23 +111,17 @@ export default function IdeaDetail() {
     setLoading(false);
 
     if (user) {
-      const { data: savedData } = await supabase.from("saved_ideas").select("id").eq("user_id", user.id).eq("idea_id", id).maybeSingle();
-      setSaved(!!savedData);
+      const [savedResult, accessResult, ndaResult, draResult] = await Promise.all([
+        supabase.from("saved_ideas").select("id").eq("user_id", user.id).eq("idea_id", id).maybeSingle(),
+        supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as any,
+        supabase.from("nda_agreements").select("id").eq("investor_id", user.id).eq("idea_id", id).maybeSingle(),
+        supabase.from("data_room_access").select("status, payment_reference").eq("user_id", user.id).eq("idea_id", id).maybeSingle(),
+      ]);
 
-      const { data: accessData } = await supabase.from("access_requests").select("status").eq("investor_id", user.id).eq("idea_id", id).maybeSingle() as { data: { status: string } | null };
-      setAccessStatus(accessData?.status || null);
-      
-      const { data: ndaData } = await supabase.from("nda_agreements").select("id").eq("investor_id", user.id).eq("idea_id", id).maybeSingle();
-      setSignedNda(!!ndaData);
-
-      const { data: drData } = await (supabase as any)
-        .from("data_room_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("idea_id", id)
-        .eq("status", "approved")
-        .maybeSingle();
-      setHasDataRoomAccess(!!drData);
+      setSaved(!!savedResult.data);
+      setAccessStatus((accessResult.data as any)?.status || null);
+      setSignedNda(!!ndaResult.data);
+      setDataRoomAccess(draResult.data as DataRoomAccess | null);
     }
   };
 
@@ -103,42 +151,69 @@ export default function IdeaDetail() {
     }
   };
 
-  // تفعيل الدفع الحقيقي واللحظي لرسوم الداتا روم (5 دولار) للموقع مباشرة عبر بايموب عند الضغط
+  // ── تفعيل الدفع عبر بايموب لفتح الداتا روم ($5) ──────────────────────────
   const handlePayDataRoom = async () => {
-    if (!idea) return;
+    if (!idea || !user) return;
     setActionLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("paymob-initiate", {
-        body: { 
-          idea_id: idea.id, 
-          amount_usd: 5.00, 
-          payment_type: "data_room_fee",
-          contract_terms: `Secure Data Room Access Fee for project: ${idea.title}` 
-        }
+        body: {
+          idea_id: idea.id,
+          amount_usd: 5.00,
+          contract_terms: `Secure Data Room Access Fee for project: ${idea.title}`,
+        },
       });
       setActionLoading(false);
-      
-      const checkoutUrl = data?.iframe_url || data?.iframeUrl;
-      if (checkoutUrl && !error) {
-        // Use in-app Payment route (iframe) — avoids proxy errors from direct redirect.
-        navigate(`/payment/data-room?iframe=${encodeURIComponent(checkoutUrl)}&payment_type=data_room_fee&idea_id=${encodeURIComponent(idea.id)}`);
-      } else {
-        toast({ title: "Payment Error", description: error?.message || "Gateway configuration missing", variant: "destructive" });
+
+      if (error || !data?.ok) {
+        // Handle 409 duplicate
+        if (data?.code === "ALREADY_PROCESSING") {
+          toast({
+            title: "Payment In Progress",
+            description: data.hint || "You already have a pending payment for this idea.",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({
+          title: "Payment Error",
+          description: data?.error || error?.message || "Gateway configuration missing",
+          variant: "destructive",
+        });
+        return;
       }
-    } catch {
+
+      // ✅ Store deal_id for payment-result page
+      sessionStorage.setItem("paymob_deal_id", data.deal_id);
+      sessionStorage.setItem("paymob_idea_id", idea.id);
+
+      const checkoutUrl = data?.iframe_url;
+      if (checkoutUrl) {
+        // Show modal instead of direct redirect
+        setPaymentModal(checkoutUrl);
+      } else {
+        toast({ title: "Payment Error", description: "No checkout URL returned", variant: "destructive" });
+      }
+    } catch (err: any) {
       setActionLoading(false);
-      toast({ title: "Connection Failed", variant: "destructive" });
+      toast({ title: "Connection Failed", description: err?.message || "Unknown error", variant: "destructive" });
     }
   };
 
   const handleSignNda = async () => {
     setActionLoading(true);
-    const { error } = await supabase.from("nda_agreements").insert({ investor_id: user!.id, idea_id: idea!.id, ip_address: "127.0.0.1", duration_months: 12 } as any);
+    const { error } = await supabase.from("nda_agreements").insert({
+      investor_id: user!.id, idea_id: idea!.id, ip_address: "127.0.0.1", duration_months: 12,
+    } as any);
     setActionLoading(false);
     if (!error) { setSignedNda(true); loadData(); }
   };
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    </div>
+  );
 
   if (!idea) return (
     <div className="container mx-auto px-4 py-20 text-center">
@@ -147,31 +222,40 @@ export default function IdeaDetail() {
     </div>
   );
 
-  const isOwner = user?.id === idea.founder_id;
+  const isOwner      = user?.id === idea.founder_id;
   const hasFullAccess = isOwner || userRole === "admin" || accessStatus === "approved";
-  const decision = (idea as Record<string, unknown>).decision as string || "pending";
-  const executionScore = (idea as Record<string, unknown>).execution_score as number || 0;
+  const dataRoomApproved = isOwner || userRole === "admin" || dataRoomAccess?.status === "approved";
+  const decision     = (idea as Record<string, unknown>).decision as string || "pending";
+  const executionScore  = (idea as Record<string, unknown>).execution_score as number || 0;
   const investmentScore = (idea as Record<string, unknown>).investment_score as number || 0;
 
   const scores = [
-    { label: t.ideaDetail.overallScore, value: idea.ai_score, icon: Sparkles },
-    { label: t.ideaDetail.marketPotential, value: idea.market_score, icon: BarChart3 },
-    { label: t.ideaDetail.innovationLevel, value: idea.innovation_score, icon: TrendingUp },
-    { label: t.ideaDetail.executionScore, value: executionScore, icon: Target },
-    { label: t.ideaDetail.investmentScore, value: investmentScore, icon: DollarSign },
-    { label: t.ideaDetail.riskLevel, value: idea.risk_score, icon: Shield },
+    { label: t.ideaDetail.overallScore,     value: idea.ai_score,       icon: Sparkles  },
+    { label: t.ideaDetail.marketPotential,  value: idea.market_score,   icon: BarChart3 },
+    { label: t.ideaDetail.innovationLevel,  value: idea.innovation_score, icon: TrendingUp },
+    { label: t.ideaDetail.executionScore,   value: executionScore,      icon: Target    },
+    { label: t.ideaDetail.investmentScore,  value: investmentScore,     icon: DollarSign },
+    { label: t.ideaDetail.riskLevel,        value: idea.risk_score,     icon: Shield    },
   ];
 
-  const DecisionIcon = decision === "accepted" ? CheckCircle : decision === "needs_improvement" ? AlertTriangle : XCircle;
+  const DecisionIcon  = decision === "accepted" ? CheckCircle : decision === "needs_improvement" ? AlertTriangle : XCircle;
   const decisionColor = decision === "accepted" ? "text-primary" : decision === "needs_improvement" ? "text-yellow-500" : "text-destructive";
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-5xl text-left" dir="ltr">
+      {/* Payment Modal */}
+      {paymentModal && (
+        <PaymentModal
+          iframeUrl={paymentModal}
+          onClose={() => { setPaymentModal(null); loadData(); }}
+        />
+      )}
+
       <Link to="/marketplace" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4 me-1" />{t.ideaDetail.backToMarketplace}
       </Link>
 
-      {/* Header القديم المعتمد */}
+      {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6 md:p-8 shadow-glass mb-6">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex-1">
@@ -210,7 +294,8 @@ export default function IdeaDetail() {
                 {accessStatus === "approved" && (
                   <>
                     <Badge className="bg-primary/10 text-primary border-primary/20">{t.ideaDetail.accessApproved}</Badge>
-                    <Button size="sm" onClick={() => navigate(`/chat-founder/${idea.founder_id}?name=${encodeURIComponent(idea.profiles?.full_name || "—")}&ideaId=${id}`)}
+                    <Button size="sm"
+                      onClick={() => navigate(`/chat-founder/${idea.founder_id}?name=${encodeURIComponent(idea.profiles?.full_name || "—")}&ideaId=${id}`)}
                       className="gradient-primary border-0 text-primary-foreground">
                       <MessageCircle className="h-4 w-4 me-1" />{t.ideaDetail.chatWithFounder}
                     </Button>
@@ -243,20 +328,18 @@ export default function IdeaDetail() {
           {hasFullAccess && <TabsTrigger value="evaluation">System Report</TabsTrigger>}
           {hasFullAccess && <TabsTrigger value="details">Financials</TabsTrigger>}
           {hasFullAccess && (idea as Record<string, unknown>).ai_recommendations && <TabsTrigger value="recommendations">System Recommendations</TabsTrigger>}
-          {(!isOwner || userRole === "admin") && <TabsTrigger value="dataroom">Secure Data Room Space</TabsTrigger>}
+          <TabsTrigger value="dataroom">Secure Data Room Space</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="p-6">
           <p className="text-foreground leading-relaxed whitespace-pre-wrap">{idea.description}</p>
-          
-          {/* عرض الحقول البسيطة المفلترة ومنع ظهور إيرور الـ NaN الحسابي */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-6 font-mono text-xs">
             <div className="border border-border/50 p-4 rounded-xl bg-background/50 shadow-inner">
-              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Required Capital</span> 
+              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Required Capital</span>
               <strong className="text-sm font-black text-foreground">${cleanAndFormatNumber(idea.capital_required, "700,000")}</strong>
             </div>
             <div className="border border-border/50 p-4 rounded-xl bg-background/50 shadow-inner">
-              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Projected Yield</span> 
+              <span className="text-muted-foreground text-[10px] block font-sans font-bold uppercase tracking-wider mb-1">Projected Yield</span>
               <strong className="text-sm font-black text-foreground">${cleanAndFormatNumber(idea.expected_revenue, "900,000")}</strong>
             </div>
           </div>
@@ -282,13 +365,13 @@ export default function IdeaDetail() {
           <TabsContent value="details" className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { label: t.ideaDetail.capitalRequired, value: idea.capital_required, icon: DollarSign },
-                { label: t.ideaDetail.expectedRevenue, value: idea.expected_revenue, icon: TrendingUp },
-                { label: t.ideaDetail.targetAudience, value: idea.target_audience, icon: Target },
-                { label: t.ideaDetail.timeline, value: idea.timeline, icon: Clock },
-                { label: t.ideaDetail.teamSize, value: idea.team_size, icon: Users },
-                { label: t.ideaDetail.teamExperience, value: idea.team_experience, icon: Users },
-                { label: t.ideaDetail.competitors, value: idea.competitors, icon: Shield },
+                { label: t.ideaDetail.capitalRequired,      value: idea.capital_required,      icon: DollarSign },
+                { label: t.ideaDetail.expectedRevenue,      value: idea.expected_revenue,      icon: TrendingUp },
+                { label: t.ideaDetail.targetAudience,       value: idea.target_audience,       icon: Target },
+                { label: t.ideaDetail.timeline,             value: idea.timeline,              icon: Clock },
+                { label: t.ideaDetail.teamSize,             value: idea.team_size,             icon: Users },
+                { label: t.ideaDetail.teamExperience,       value: idea.team_experience,       icon: Users },
+                { label: t.ideaDetail.competitors,          value: idea.competitors,           icon: Shield },
                 { label: t.ideaDetail.competitiveAdvantage, value: idea.competitive_advantage, icon: Sparkles },
               ].filter(d => d.value).map((d, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
@@ -310,38 +393,37 @@ export default function IdeaDetail() {
           </TabsContent>
         )}
 
-        {/* حقل الداتا روم المؤمن كلياً بـ 5 دولار حقيقية من بايموب */}
-        {(!isOwner || userRole === "admin") && (
-          <TabsContent value="dataroom" className="p-6">
-            {!hasDataRoomAccess && !isOwner && userRole !== "admin" ? (
-              <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
-                <FolderLock className="h-12 w-12 mx-auto text-amber-500" />
-                <h3 className="text-lg font-bold tracking-tight">Secure Corporate Data Room Locked</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">This sandbox contains deep structural engineering blueprints and financial dossiers. Access requires a platform fee of $5.00 dynamically routed via official payment gateways.</p>
-                <Button onClick={handlePayDataRoom} disabled={actionLoading} className="gradient-primary text-white px-8 font-semibold h-10 shadow-sm">
-                  {actionLoading ? "Initializing Gateway..." : "Unlock Secure Vault Space ($5.00)"}
-                </Button>
-              </div>
-            ) : !signedNda && !isOwner ? (
-              <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
-                <AlertTriangle className="h-12 w-12 mx-auto text-blue-500" />
-                <h3 className="text-lg font-bold tracking-tight">Non-Disclosure Agreement Required</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">Your payment has been logged. To release the underlying file storage node, sign the systemic electronic NDA constraint.</p>
-                <Button onClick={handleSignNda} className="bg-blue-600 text-white hover:bg-blue-700 font-semibold h-10 px-8 rounded-xl">Accept & Lock Electronic NDA</Button>
-              </div>
-            ) : (
-              <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-4 max-w-3xl mx-auto">
-                <h3 className="font-bold text-emerald-800 text-sm flex items-center gap-2"><CheckCircle className="h-5 w-5 text-emerald-600" /> Secure Data Room Environment Validated</h3>
-                {idea.document_url ? (
+        {/* ── Data Room Tab ─────────────────────────────────────────── */}
+        <TabsContent value="dataroom" className="p-6">
+          {dataRoomApproved ? (
+            /* ✅ APPROVED: show the actual data room content */
+            <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-4 max-w-3xl mx-auto">
+              <h3 className="font-bold text-emerald-800 dark:text-emerald-400 text-sm flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-emerald-600" /> Secure Data Room Environment Validated
+              </h3>
+              {!signedNda && !isOwner ? (
+                /* NDA step */
+                <div className="p-6 border-2 border-dashed border-blue-300/60 rounded-xl text-center space-y-4">
+                  <AlertTriangle className="h-10 w-10 mx-auto text-blue-500" />
+                  <h4 className="text-base font-bold">Non-Disclosure Agreement Required</h4>
+                  <p className="text-sm text-muted-foreground">Your payment is confirmed. Sign the NDA to unlock the file vault.</p>
+                  <Button onClick={handleSignNda} disabled={actionLoading}
+                    className="bg-blue-600 text-white hover:bg-blue-700 font-semibold h-10 px-8 rounded-xl">
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                    Accept & Sign Electronic NDA
+                  </Button>
+                </div>
+              ) : (
+                /* Document access */
+                idea.document_url ? (
                   <div className="p-4 bg-background border border-border/40 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-sm">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <FileText className="h-5 w-5 text-primary shrink-0" />
-                      <span className="text-sm font-mono text-slate-800 font-bold truncate block max-w-[280px]">
+                      <span className="text-sm font-mono text-slate-800 dark:text-slate-200 font-bold truncate block max-w-[280px]">
                         {idea.document_url.split('/').pop()}
                       </span>
                     </div>
-                    {/* حل مشكلة الـ Bucket not found بجلب مسار الحاوية الحقيقي ديناميكياً من الـ Instance النشطة */}
-                    <Button size="sm" variant="outline" className="text-black border-slate-300 h-9 bg-white" 
+                    <Button size="sm" variant="outline" className="text-black dark:text-white border-slate-300 h-9 bg-white dark:bg-slate-800"
                       onClick={() => {
                         const { data } = supabase.storage.from('idea-documents').getPublicUrl(idea.document_url!);
                         window.open(data.publicUrl, '_blank');
@@ -350,12 +432,54 @@ export default function IdeaDetail() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="text-xs text-zinc-500 italic">No document payload uploaded. Core specifications are available in the main visuals sheet.</div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-        )}
+                  <div className="text-xs text-zinc-500 italic">No document uploaded. Core specifications are in the main visuals sheet.</div>
+                )
+              )}
+            </div>
+          ) : dataRoomAccess?.status === "pending" ? (
+            /* ⏳ PENDING: payment made, waiting for webhook */
+            <div className="p-8 border-2 border-dashed border-yellow-300/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <Loader2 className="h-12 w-12 mx-auto text-yellow-500 animate-spin" />
+              <h3 className="text-lg font-bold tracking-tight">Payment Being Confirmed</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Your payment is being processed. This usually takes a few seconds.
+                Refresh the page to check status.
+              </p>
+              <Button onClick={() => loadData()} variant="outline" className="mt-2">
+                Refresh Status
+              </Button>
+            </div>
+          ) : (
+            /* 🔒 LOCKED: no payment yet */
+            <div className="p-8 border-2 border-dashed border-border/60 rounded-xl text-center space-y-4 max-w-2xl mx-auto">
+              <FolderLock className="h-12 w-12 mx-auto text-amber-500" />
+              <h3 className="text-lg font-bold tracking-tight">Secure Corporate Data Room Locked</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This vault contains deep structural engineering blueprints and financial dossiers.
+                Access requires a one-time platform fee of <strong>$5.00</strong> via secure payment gateway.
+              </p>
+              {!user ? (
+                <Link to="/login">
+                  <Button className="gradient-primary text-white px-8 font-semibold h-10 shadow-sm">
+                    Login to Unlock
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  onClick={handlePayDataRoom}
+                  disabled={actionLoading}
+                  className="gradient-primary text-white px-8 font-semibold h-10 shadow-sm"
+                >
+                  {actionLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin me-2" />Initializing Gateway…</>
+                  ) : (
+                    <><CreditCard className="h-4 w-4 me-2" />Unlock Secure Vault ($5.00)</>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );
