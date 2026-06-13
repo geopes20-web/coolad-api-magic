@@ -3,8 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Download, ArrowLeft, FileSignature, ShieldCheck } from "lucide-react";
+import { Loader2, Download, ArrowLeft, FileSignature, ShieldCheck, Eye, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLanguage } from "@/i18n/LanguageContext"; 
 
 type Profile = { id: string; full_name: string; avatar_url: string | null; email?: string };
@@ -39,6 +40,10 @@ export default function Contract() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [investorInputName, setInvestorInputName] = useState("");
   const [founderInputName, setFounderInputName] = useState("");
+
+  const [partnerKyc, setPartnerKyc] = useState<any>(null);
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [loadingKyc, setLoadingKyc] = useState(false);
 
   useEffect(() => {
     if (!dealId) return;
@@ -109,6 +114,26 @@ export default function Contract() {
     setSigningLoading(false);
   };
 
+  const handleViewPartnerKyc = async () => {
+    if (deal?.payment_status !== "paid") return;
+    setLoadingKyc(true);
+    const partnerId = isFounder ? deal.investor_id : deal.founder_id;
+    try {
+      const { data, error } = await supabase.functions.invoke("get-partner-kyc", {
+        body: { partner_id: partnerId }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.partner) {
+        setPartnerKyc(data.partner);
+        setKycModalOpen(true);
+      }
+    } catch (err: any) {
+      toast({ title: language === "ar" ? "خطأ" : "Error", description: err.message, variant: "destructive" });
+    }
+    setLoadingKyc(false);
+  };
+
   const fmtDate = (d: string | null) => {
     if (!d) return "—";
     return new Date(d).toLocaleString(language === "ar" ? "ar-EG" : "en-US", {
@@ -127,10 +152,14 @@ export default function Contract() {
       name: "الاسم الكامل",
       email: "البريد الإلكتروني",
       details: "تفاصيل وبنود الاستثمار الحاكمة للمنصة:",
-      amount: "مبلغ التمويل المالي",
+      amount: "إجمالي مبلغ الاستثمار",
       equity: "نسبة الملكية المفوضة",
       valuation: "تقييم الشركة الإجمالي",
-      fee: "رسوم المنصة والوساطة المقتطعة (10%)",
+      fee: "رسوم منصة IDEVEST الاستقطاعية (10%)",
+      transfer: "المبلغ المتبقي للتحويل المباشر بين الطرفين",
+      viewContact: "عرض معلومات الاتصال للشريك",
+      partnerInfo: "المعلومات الموثقة للشريك",
+      close: "إغلاق",
       termsTitle: "شروط العقد والبنود المخصصة المضافة:",
       signBtn: "أوقّع العقد رقمياً الآن",
       placeholder: "اكتب اسمك الكامل للتوقيع بالوقت الحالي",
@@ -162,7 +191,11 @@ export default function Contract() {
       amount: "Total Investment Capital",
       equity: "Assigned Equity Percentage",
       valuation: "Total Calculated Valuation",
-      fee: "Platform & Escrow Fee (10%)",
+      fee: "Platform Facilitation Fee (10%)",
+      transfer: "Direct Transfer Between Parties",
+      viewContact: "View Partner Contact Information",
+      partnerInfo: "Full Partner Information",
+      close: "Close",
       termsTitle: "Special Contract Terms & Custom Conditions:",
       signBtn: "Sign Document Digitally Now",
       placeholder: "Type your full name verbatim to sign",
@@ -198,11 +231,18 @@ export default function Contract() {
             <ArrowLeft className={`h-4 w-4 ${language === "ar" ? "ms-1" : "me-1"}`} /> {t.back}
           </Link>
         </Button>
-        {bothSigned && (
-          <Button onClick={() => window.print()} className="bg-slate-900 text-white hover:bg-slate-800">
-            <Download className="h-4 w-4 me-2" /> {t.download}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {deal.payment_status === "paid" && (
+            <Button onClick={handleViewPartnerKyc} disabled={loadingKyc} className="bg-blue-600 text-white hover:bg-blue-700">
+              {loadingKyc ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : <Eye className="h-4 w-4 me-2" />} {t.viewContact}
+            </Button>
+          )}
+          {bothSigned && (
+            <Button onClick={() => window.print()} className="bg-slate-900 text-white hover:bg-slate-800">
+              <Download className="h-4 w-4 me-2" /> {t.download}
+            </Button>
+          )}
+        </div>
       </div>
 
       {!bothSigned && (
@@ -258,14 +298,6 @@ export default function Contract() {
               <span className="font-sans font-bold">{t.amount}:</span>
               <span>${Number(deal.investment_amount_usd).toLocaleString()}</span>
             </div>
-            <div className="border border-slate-200 p-3 flex justify-between bg-slate-50/30">
-              <span className="font-sans font-bold">{t.equity}:</span>
-              <span>{deal.equity_percentage}%</span>
-            </div>
-            <div className="border border-slate-200 p-3 flex justify-between bg-slate-50/30">
-              <span className="font-sans font-bold">{t.valuation}:</span>
-              <span>${Number(deal.valuation_usd || 0).toLocaleString()}</span>
-            </div>
             <div className="border border-emerald-300 p-3 flex justify-between bg-emerald-50/40 text-emerald-900">
               <span className="font-sans font-bold">{t.fee}:</span>
               <span className="font-bold">
@@ -273,6 +305,20 @@ export default function Contract() {
                   ? Number(deal.platform_fee_amount).toLocaleString() 
                   : Number(deal.investment_amount_usd * 0.10).toLocaleString()}
               </span>
+            </div>
+            <div className="border border-blue-300 p-3 flex justify-between bg-blue-50/40 text-blue-900 col-span-2 md:col-span-1">
+              <span className="font-sans font-bold">{t.transfer}:</span>
+              <span className="font-bold text-lg">
+                ${Number(deal.investment_amount_usd - (deal.platform_fee_amount ?? deal.investment_amount_usd * 0.10)).toLocaleString()}
+              </span>
+            </div>
+            <div className="border border-slate-200 p-3 flex justify-between bg-slate-50/30">
+              <span className="font-sans font-bold">{t.equity}:</span>
+              <span>{deal.equity_percentage}%</span>
+            </div>
+            <div className="border border-slate-200 p-3 flex justify-between bg-slate-50/30">
+              <span className="font-sans font-bold">{t.valuation}:</span>
+              <span>${Number(deal.valuation_usd || 0).toLocaleString()}</span>
             </div>
           </div>
 
@@ -351,6 +397,57 @@ export default function Contract() {
           </div>
         </div>
       </div>
+
+      {/* Partner KYC dialog */}
+      <Dialog open={kycModalOpen} onOpenChange={setKycModalOpen}>
+        <DialogContent className="bg-white border border-slate-300 text-slate-900 max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 flex items-center gap-2">
+              <User className="h-5 w-5 text-blue-600" />
+              {t.partnerInfo}
+            </DialogTitle>
+          </DialogHeader>
+          {partnerKyc && (
+            <div className="space-y-4" dir={language === "ar" ? "rtl" : "ltr"}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "الاسم الكامل" : "Full Name"}</span><strong className="text-slate-900">{partnerKyc.full_name || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "البريد الإلكتروني" : "Email Address"}</span><strong className="text-slate-900">{partnerKyc.email || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "رقم الهاتف" : "Phone Number"}</span><strong className="text-slate-900" dir="ltr">{partnerKyc.phone_number || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "الرقم القومي" : "National ID Number"}</span><strong className="text-slate-900">{partnerKyc.national_id || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "الجنسية" : "Nationality"}</span><strong className="text-slate-900">{partnerKyc.nationality || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "تاريخ الميلاد" : "Date of Birth"}</span><strong className="text-slate-900">{partnerKyc.date_of_birth || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "حالة التوثيق (KYC)" : "KYC Verification Status"}</span><strong className="text-emerald-600 uppercase">{partnerKyc.kyc_status || "—"}</strong></div>
+                <div><span className="text-slate-500 block text-xs">{language === "ar" ? "تاريخ التوثيق" : "Verification Date"}</span><strong className="text-slate-900">{partnerKyc.verified_at ? new Date(partnerKyc.verified_at).toLocaleDateString() : "—"}</strong></div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="font-bold text-sm text-slate-800">{language === "ar" ? "وثائق الهوية" : "Identification Documents"}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-slate-500 block text-xs mb-2">{language === "ar" ? "الوجه الأمامي" : "Front ID Image"}</span>
+                    {partnerKyc.id_card_front_url ? (
+                      <img src={partnerKyc.id_card_front_url} alt="ID Front" className="w-full rounded-xl border border-slate-300 object-cover" />
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl h-32 flex items-center justify-center text-xs text-slate-400">Not Available</div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs mb-2">{language === "ar" ? "الوجه الخلفي" : "Back ID Image"}</span>
+                    {partnerKyc.id_card_back_url ? (
+                      <img src={partnerKyc.id_card_back_url} alt="ID Back" className="w-full rounded-xl border border-slate-300 object-cover" />
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl h-32 flex items-center justify-center text-xs text-slate-400">Not Available</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKycModalOpen(false)} className="border-slate-300 w-full">{t.close}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style>{`
         @media print {

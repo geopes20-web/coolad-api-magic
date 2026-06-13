@@ -109,7 +109,8 @@ interface FilterResult {
   severity: 'low' | 'medium' | 'high';
 }
 
-export function analyzeMessage(text: string): FilterResult {
+export function analyzeMessage(text: string, skipFilter: boolean = false): FilterResult {
+  if (skipFilter) return { blocked: false, patterns: [], severity: 'low' };
   if (!text || text.length < 3) return { blocked: false, patterns: [], severity: 'low' };
 
   const detected: string[] = [];

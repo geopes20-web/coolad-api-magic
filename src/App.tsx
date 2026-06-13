@@ -15,6 +15,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
+import ConfirmEmail from "@/pages/ConfirmEmail";
 import Dashboard from "@/pages/Dashboard";
 import SubmitIdea from "@/pages/SubmitIdea";
 import Marketplace from "@/pages/Marketplace";
@@ -46,6 +47,7 @@ function AnimatedRoutes() {
         <Route path="/chat-founder/:founderId" element={<PageTransition><ChatWithFounder /></PageTransition>} />
         <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
         <Route path="/register" element={<PageTransition><Register /></PageTransition>} />
+        <Route path="/confirm-email" element={<PageTransition><ConfirmEmail /></PageTransition>} />
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />

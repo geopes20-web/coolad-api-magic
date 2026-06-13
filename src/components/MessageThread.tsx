@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Send, Loader2, ArrowLeft, User, Handshake, FileSignature, CreditCard, CheckCircle2, XCircle } from "lucide-react";
+import { Send, Loader2, ArrowLeft, User, Handshake, FileSignature, CreditCard, CheckCircle2, XCircle, AlertCircle, Eye } from "lucide-react";
 import { analyzeMessage, BLOCKED_MESSAGE_EN, BLOCKED_MESSAGE_AR } from "@/lib/chatFilter";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -47,6 +47,10 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const [signing, setSigning] = useState(false);
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  
+  const [partnerKyc, setPartnerKyc] = useState<any>(null);
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [loadingKyc, setLoadingKyc] = useState(false);
   
   const [treasuryAuditedFee, setTreasuryAuditedFee] = useState<number>(0);
 
@@ -232,6 +236,28 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
     return () => { supabase.removeChannel(channel); };
   }, [user, otherUserId, ideaId]);
 
+  const handleViewPartnerKyc = async () => {
+    if (!activeDeal || activeDeal.payment_status !== "paid") return;
+    setLoadingKyc(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoadingKyc(false); return; }
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("get-partner-kyc", {
+        body: { partner_id: otherUserId }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.partner) {
+        setPartnerKyc(data.partner);
+        setKycModalOpen(true);
+      }
+    } catch (err: any) {
+      toast({ title: isAr ? "خطأ" : "Error", description: err.message, variant: "destructive" });
+    }
+    setLoadingKyc(false);
+  };
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -239,7 +265,7 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
 
-    const analysis = analyzeMessage(input);
+    const analysis = analyzeMessage(input, activeDeal?.payment_status === "paid");
     if (analysis.blocked) {
       toast({
         title: "⚠️",
@@ -331,11 +357,16 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
                         <CreditCard className="h-3.5 w-3.5 me-1" /> {isAr ? "ادفع الآن" : "Pay now"}
                       </Button>
                     )}
-                    {/* ✅ التوجيه الصريح والمثالي الموحد لكلا الطرفين لفتح صفحة مراجعة وثيقة وملف العقد النهائي الموثق بنجاح */}
                     {isPaidSuccess && (
-                      <Button size="sm" onClick={() => { window.location.href = `/contract/${activeDeal.id}`; }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-4 rounded-xl animate-fade-in">
-                        <FileSignature className="h-3.5 w-3.5 me-1" /> {isAr ? "تسجيل العقد" : "Sign Contract Blueprint"}
-                      </Button>
+                      <>
+                        <Button size="sm" onClick={handleViewPartnerKyc} disabled={loadingKyc} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 px-4 rounded-xl animate-fade-in">
+                          {loadingKyc ? <Loader2 className="h-3.5 w-3.5 animate-spin me-1" /> : <Eye className="h-3.5 w-3.5 me-1" />} 
+                          {isAr ? "عرض معلومات الشريك" : "View Partner Contact Information"}
+                        </Button>
+                        <Button size="sm" onClick={() => { window.location.href = `/contract/${activeDeal.id}`; }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-4 rounded-xl animate-fade-in">
+                          <FileSignature className="h-3.5 w-3.5 me-1" /> {isAr ? "تسجيل العقد" : "Sign Contract Blueprint"}
+                        </Button>
+                      </>
                     )}
                     {showCancel && (
                       <Button size="sm" variant="outline" onClick={handleCancelDeal} disabled={cancelling} className="text-destructive border-zinc-800">
@@ -352,6 +383,15 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
 
       {/* Messages List - لون الخلفية القديم العادي النظيف */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0B1528]">
+        {activeDeal?.payment_status === "paid" && (
+          <div className="mx-auto max-w-[85%] bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 p-4 rounded-xl text-sm text-center mb-4 space-y-2">
+            <CheckCircle2 className="h-6 w-6 text-emerald-400 mx-auto" />
+            <p className="font-bold text-base">{isAr ? "اكتمل الدفع بنجاح" : "Payment completed successfully."}</p>
+            <p>{isAr ? "تم دفع رسوم منصة IDEVEST." : "The IdeVest facilitation fee has been paid."}</p>
+            <p>{isAr ? "يجب تحويل مبلغ الاستثمار المتبقي مباشرة بين المستثمر والمؤسس." : "The remaining investment amount must be transferred directly between the investor and founder."}</p>
+            <p className="text-emerald-100 font-semibold">{isAr ? "يمكنكم الآن الوصول إلى معلومات الاتصال الموثقة الخاصة ببعضكم البعض والتواصل بحرية." : "You may now access each other's verified contact information and communicate freely."}</p>
+          </div>
+        )}
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
         ) : messages.length === 0 ? (
@@ -415,12 +455,75 @@ export default function MessageThread({ otherUserId, otherUserName, ideaId, onBa
               <label className="text-xs text-zinc-400">{isAr ? "ملاحظات / شروط إضافية" : "Notes / extra terms"}</label>
               <Textarea rows={3} value={terms} onChange={e => setTerms(e.target.value)} className="bg-zinc-900 border-zinc-800 text-white" />
             </div>
+            
+            <div className="mt-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs leading-relaxed space-y-2">
+              <div className="font-bold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                {isAr ? "فتح معلومات الاتصال" : "Contact Information Unlock"}
+              </div>
+              <p>
+                {isAr 
+                  ? "بعد دفع رسوم منصة IDEVEST (10٪)، سيحصل كلا الطرفين على حق الوصول إلى معلومات الـ KYC الموثقة بالكامل الخاصة ببعضهما البعض، بما في ذلك أرقام الهواتف ورسائل البريد الإلكتروني ووثائق الهوية. سيتم بعد ذلك تحويل مبلغ الاستثمار المتبقي مباشرة بين الطرفين خارج المنصة."
+                  : "After paying the 10% IdeVest facilitation fee, both parties will gain access to each other's complete verified KYC information, phone numbers, email addresses, and identification documents. The remaining investment amount will then be transferred directly between both parties outside the platform."}
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProposeOpen(false)} className="border-zinc-800 text-zinc-300">Cancel</Button>
             <Button onClick={handlePropose} disabled={proposing} className="gradient-primary border-0 text-white">
               Send Proposal
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partner KYC dialog */}
+      <Dialog open={kycModalOpen} onOpenChange={setKycModalOpen}>
+        <DialogContent className="bg-zinc-950 border border-zinc-800 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <User className="h-5 w-5 text-blue-400" />
+              {isAr ? "المعلومات الموثقة للشريك" : "Full Partner Information"}
+            </DialogTitle>
+          </DialogHeader>
+          {partnerKyc && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "الاسم الكامل" : "Full Name"}</span><strong className="text-zinc-200">{partnerKyc.full_name || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "البريد الإلكتروني" : "Email Address"}</span><strong className="text-zinc-200">{partnerKyc.email || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "رقم الهاتف" : "Phone Number"}</span><strong className="text-zinc-200">{partnerKyc.phone_number || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "الرقم القومي" : "National ID Number"}</span><strong className="text-zinc-200">{partnerKyc.national_id || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "الجنسية" : "Nationality"}</span><strong className="text-zinc-200">{partnerKyc.nationality || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "تاريخ الميلاد" : "Date of Birth"}</span><strong className="text-zinc-200">{partnerKyc.date_of_birth || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "حالة التوثيق (KYC)" : "KYC Verification Status"}</span><strong className="text-emerald-400 uppercase">{partnerKyc.kyc_status || "—"}</strong></div>
+                <div><span className="text-zinc-500 block text-xs">{isAr ? "تاريخ التوثيق" : "Verification Date"}</span><strong className="text-zinc-200">{partnerKyc.verified_at ? new Date(partnerKyc.verified_at).toLocaleDateString() : "—"}</strong></div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="font-bold text-sm text-zinc-300">{isAr ? "وثائق الهوية" : "Identification Documents"}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-zinc-500 block text-xs mb-2">{isAr ? "الوجه الأمامي" : "Front ID Image"}</span>
+                    {partnerKyc.id_card_front_url ? (
+                      <img src={partnerKyc.id_card_front_url} alt="ID Front" className="w-full rounded-xl border border-zinc-700 object-cover" />
+                    ) : (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-xl h-32 flex items-center justify-center text-xs text-zinc-500">Not Available</div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 block text-xs mb-2">{isAr ? "الوجه الخلفي" : "Back ID Image"}</span>
+                    {partnerKyc.id_card_back_url ? (
+                      <img src={partnerKyc.id_card_back_url} alt="ID Back" className="w-full rounded-xl border border-zinc-700 object-cover" />
+                    ) : (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-xl h-32 flex items-center justify-center text-xs text-zinc-500">Not Available</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKycModalOpen(false)} className="border-zinc-800 text-zinc-300 w-full">{isAr ? "إغلاق" : "Close"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

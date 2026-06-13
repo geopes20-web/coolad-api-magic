@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Shield, Users as UsersIcon, FileCheck, Lightbulb, Eye, Check, X,
-  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus, BookOpen
+  AlertCircle, CreditCard, Flag, DollarSign, Trash2, UserPlus, BookOpen, Handshake
 } from "lucide-react";
 
 type KycRow = {
@@ -92,6 +92,9 @@ export default function Admin() {
     .filter(d => d.payment_status === "paid" && d.status === "completed")
     .reduce((sum, d) => sum + (d.investment_amount_usd * 0.10), 0);
 
+  const unlockedConnections = deals.filter(d => d.payment_status === "paid").length;
+  const successfulMatches = deals.filter(d => d.status === "completed").length;
+
   const approveKyc = async (id: string) => {
     const { error } = await supabase.from("kyc_verifications").update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString(), rejection_reason: null }).eq("id", id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -159,11 +162,11 @@ export default function Admin() {
 
   const statCards = [
     [isAr ? "المستخدمون" : "Users", stats.total_users, UsersIcon],
+    [isAr ? "الصفقات المكتملة" : "Successful Matches", successfulMatches, Handshake],
+    [isAr ? "اتصالات مفتوحة" : "Unlocked Connections", unlockedConnections, BookOpen],
+    [isAr ? "إجمالي رسوم المنصة" : "Total Facilitation Fees Collected", `$${Number(totalPlatformFeesCollected).toLocaleString()}`, DollarSign],
     ["KYC Pending", stats.pending_kyc, FileCheck],
-    [isAr ? "الأفكار" : "Ideas", stats.total_ideas, Lightbulb],
-    [isAr ? "البلاغات" : "Reports", stats.open_reports, Flag],
     [isAr ? "مدفوعات معلقة" : "Pending Pay", stats.pending_payments, CreditCard],
-    [isAr ? "صافي أرباح المنصة المعتمدة" : "Verified Revenue (10%)", `$${Number(totalPlatformFeesCollected).toLocaleString()}`, DollarSign],
   ] as const;
 
   return (

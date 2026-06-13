@@ -83,45 +83,55 @@ serve(async (req) => {
       }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Run server-side filter
-    let violations = detectViolations(content);
+    // Check if there is a paid deal to bypass the filter
+    const { data: paidDeal } = await admin.from("deals").select("id")
+      .or(`and(founder_id.eq.${user.id},investor_id.eq.${receiver_id}),and(founder_id.eq.${receiver_id},investor_id.eq.${user.id})`)
+      .eq("payment_status", "paid")
+      .limit(1)
+      .maybeSingle();
 
-    // Cross-message obfuscation: concatenate the user's last short messages
-    // to the same receiver in the past 2 minutes and re-run detection.
-    if (violations.length === 0) {
-      const { data: recent } = await admin
-        .from("messages")
-        .select("content, created_at")
-        .eq("sender_id", user.id)
-        .eq("receiver_id", receiver_id)
-        .gte("created_at", new Date(Date.now() - 120_000).toISOString())
-        .order("created_at", { ascending: true })
-        .limit(20);
-      const fragments = (recent || []).map((m: any) => String(m.content || "")).filter(s => s.length <= 30);
-      if (fragments.length > 0) {
-        const combined = fragments.join("") + content;
-        const combinedViolations = detectViolations(combined);
-        if (combinedViolations.length > 0) {
-          violations = combinedViolations.map(v => `cross_msg_${v}`);
+    let violations: string[] = [];
+    if (!paidDeal) {
+      // Run server-side filter
+      violations = detectViolations(content);
+
+      // Cross-message obfuscation: concatenate the user's last short messages
+      // to the same receiver in the past 2 minutes and re-run detection.
+      if (violations.length === 0) {
+        const { data: recent } = await admin
+          .from("messages")
+          .select("content, created_at")
+          .eq("sender_id", user.id)
+          .eq("receiver_id", receiver_id)
+          .gte("created_at", new Date(Date.now() - 120_000).toISOString())
+          .order("created_at", { ascending: true })
+          .limit(20);
+        const fragments = (recent || []).map((m: any) => String(m.content || "")).filter(s => s.length <= 30);
+        if (fragments.length > 0) {
+          const combined = fragments.join("") + content;
+          const combinedViolations = detectViolations(combined);
+          if (combinedViolations.length > 0) {
+            violations = combinedViolations.map(v => `cross_msg_${v}`);
+          }
         }
       }
-    }
 
-    if (violations.length > 0) {
-      // Log the violation
-      await admin.from("chat_violations").insert({
-        user_id: user.id,
-        receiver_id,
-        blocked_content: content.slice(0, 500),
-        detected_patterns: violations,
-        severity: violations.length >= 3 ? 'high' : 'medium',
-      });
+      if (violations.length > 0) {
+        // Log the violation
+        await admin.from("chat_violations").insert({
+          user_id: user.id,
+          receiver_id,
+          blocked_content: content.slice(0, 500),
+          detected_patterns: violations,
+          severity: violations.length >= 3 ? 'high' : 'medium',
+        });
 
-      return new Response(JSON.stringify({
-        error: "blocked",
-        message: "External contact info detected",
-        patterns: violations,
-      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({
+          error: "blocked",
+          message: "External contact info detected",
+          patterns: violations,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // Insert message

@@ -21,6 +21,7 @@ interface AuthTranslations {
   noAccount: string; hasAccount: string; signUp: string; signIn: string;
   resetLink: string; newPassword: string; updatePassword: string;
   checkEmail: string; resetSent: string; passwordUpdated: string;
+  confirmEmail: string; confirmEmailSent: string; resendConfirmation: string; resendConfirmationSuccess: string;
 }
 interface FooterTranslations {
   description: string; product: string; company: string; about: string;
@@ -143,6 +144,10 @@ export const translations: Record<Language, TranslationShape> = {
       checkEmail: "Account created successfully! You are now logged in.",
       resetSent: "Check your email for a password reset link.",
       passwordUpdated: "Password updated successfully.",
+      confirmEmail: "Confirm your email",
+      confirmEmailSent: "A confirmation link has been sent to your email.",
+      resendConfirmation: "Resend confirmation email",
+      resendConfirmationSuccess: "Confirmation email resent successfully.",
     },
     footer: {
       description: "AI-powered startup evaluation and investment marketplace. Where ideas meet capital.",
@@ -269,6 +274,10 @@ export const translations: Record<Language, TranslationShape> = {
       checkEmail: "تم إنشاء الحساب بنجاح! أنت الآن مسجل الدخول.",
       resetSent: "تحقق من بريدك الإلكتروني لرابط إعادة التعيين.",
       passwordUpdated: "تم تحديث كلمة المرور بنجاح.",
+      confirmEmail: "أكد بريدك الإلكتروني",
+      confirmEmailSent: "تم إرسال رابط التأكيد إلى بريدك الإلكتروني.",
+      resendConfirmation: "إعادة إرسال بريد التأكيد",
+      resendConfirmationSuccess: "تمت إعادة إرسال بريد التأكيد بنجاح.",
     },
     footer: {
       description: "منصة تقييم الشركات الناشئة والاستثمار بالذكاء الاصطناعي. حيث تلتقي الأفكار برأس المال.",

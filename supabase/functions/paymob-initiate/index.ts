@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
     }
 
     const platformFee = isDataRoom ? 0 : +(effectiveAmountUsd * PLATFORM_FEE_PCT / 100).toFixed(2);
-    const totalEGPCents = Math.round(effectiveAmountUsd * FX_USD_TO_EGP * 100);
+    const amountToChargeUsd = isDataRoom ? effectiveAmountUsd : platformFee;
+    const totalEGPCents = Math.round(amountToChargeUsd * FX_USD_TO_EGP * 100);
 
     const origin = req.headers.get("origin") || "https://coolad-api-magic.lovable.app";
     const redirectionUrl = `${origin}/payment-result`;

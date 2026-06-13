@@ -84,34 +84,48 @@ export default function Register() {
       return;
     }
     
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim();
+
     setLoading(true);
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
-        data: { full_name: fullName, phone_number: phone.trim() },
-        emailRedirectTo: window.location.origin,
+        data: { full_name: fullName, phone_number: normalizedPhone, role },
+        emailRedirectTo: `${window.location.origin}/confirm-email?email=${encodeURIComponent(normalizedEmail)}`,
       },
     });
 
     if (error) {
+      setLoading(false);
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
       return;
     }
 
-    if (data.user) {
+    if (data.user && data.session) {
       await supabase.from("user_roles").insert({ user_id: data.user.id, role });
     }
 
     setLoading(false);
-    toast({
-      title: t.common.success,
-      description: isAr
-        ? "تم إنشاء الحساب! الخطوة التالية: تأكيد رقم الهاتف"
-        : "Account created! Next: verify your phone",
-    });
-    navigate("/verify-phone");
+    if (data.session) {
+      toast({
+        title: t.common.success,
+        description: isAr
+          ? "تم إنشاء الحساب! الخطوة التالية: تأكيد رقم الهاتف"
+          : "Account created! Next: verify your phone",
+      });
+      navigate("/verify-phone");
+    } else {
+      toast({
+        title: t.common.success,
+        description: isAr
+          ? "تم إنشاء الحساب! تحقق من بريدك الإلكتروني لتأكيد الحساب."
+          : "Account created! Check your email to confirm your account.",
+      });
+      navigate(`/confirm-email?email=${encodeURIComponent(normalizedEmail)}`);
+    }
   };
 
   return (

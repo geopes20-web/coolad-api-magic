@@ -17,24 +17,35 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     setLoading(false);
 
     if (error) {
+      const errorMessage = error.message.toLowerCase();
+      const shouldOfferResend = /confirm|unconfirmed|verify|verification/.test(errorMessage);
+      setCanResendConfirmation(shouldOfferResend);
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
     } else if (data.user) {
-      // Check if admin → redirect straight to /admin
+      const roleMetadata = data.user.user_metadata?.role as string | undefined;
       const { data: roleRow } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id)
-        .eq("role", "admin")
         .maybeSingle();
-      navigate(roleRow ? "/admin" : "/dashboard");
+
+      if (!roleRow && roleMetadata) {
+        await supabase.from("user_roles").insert({ user_id: data.user.id, role: roleMetadata });
+      }
+
+      const isAdmin = roleRow?.role === "admin";
+      navigate(isAdmin ? "/admin" : "/dashboard");
     }
   };
 
@@ -93,6 +104,40 @@ export default function Login() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t.auth.signIn}
             </Button>
           </form>
+
+          {canResendConfirmation && (
+            <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">
+              <p className="mb-3">
+                {isAr
+                  ? "حسابك لم يتم تأكيده بعد. يمكنك إعادة إرسال رابط التأكيد إلى بريدك الإلكتروني." 
+                  : "Your email is not confirmed yet. You can resend the confirmation link."}
+              </p>
+              <Button
+                type="button"
+                className="w-full"
+                variant="outline"
+                disabled={resendLoading || !email.trim()}
+                onClick={async () => {
+                  setResendLoading(true);
+                  const { error } = await supabase.auth.resend({
+                    email: email.trim().toLowerCase(),
+                    type: "signup",
+                    options: {
+                      emailRedirectTo: `${window.location.origin}/confirm-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
+                    },
+                  });
+                  setResendLoading(false);
+                  if (error) {
+                    toast({ title: t.common.error, description: error.message, variant: "destructive" });
+                  } else {
+                    toast({ title: t.common.success, description: t.auth.resendConfirmationSuccess });
+                  }
+                }}
+              >
+                {resendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t.auth.resendConfirmation}
+              </Button>
+            </div>
+          )}
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             {t.auth.noAccount}{" "}
